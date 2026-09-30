@@ -1,106 +1,117 @@
-# 🎯 GoalTracker Pro (Full-Screen & MySQL Sync)
+# 🎯 GoalTracker Pro (Decoupled Full-Stack Architecture)
 
-A modern, high-performance personal goal and habit management application built with PHP, Vanilla JavaScript / React, and MySQL.
+A state-of-the-art Goal and Habit Tracking system built with a **Decoupled Architecture**:
+- **Frontend**: Standalone **React (Vite) SPA** with custom design system, dark/light themes, and Canvas Confetti.
+- **Backend**: Clean **Object-Oriented PHP REST API** with Singleton Database management, Repository pattern, and MySQL persistence.
 
-![GoalTracker Pro](https://img.shields.io/badge/PHP-8.x-777BB4?style=for-the-badge&logo=php&logoColor=white)
-![React](https://img.shields.io/badge/React-18.x-61DAFB?style=for-the-badge&logo=react&logoColor=black)
+![PHP](https://img.shields.io/badge/PHP-8.x_OOP-777BB4?style=for-the-badge&logo=php&logoColor=white)
+![React](https://img.shields.io/badge/React-19.x-61DAFB?style=for-the-badge&logo=react&logoColor=black)
+![Vite](https://img.shields.io/badge/Vite-8.x-646CFF?style=for-the-badge&logo=vite&logoColor=white)
 ![MySQL](https://img.shields.io/badge/MySQL-InnoDB-4479A1?style=for-the-badge&logo=mysql&logoColor=white)
 
 ---
 
-## 🌟 Key Features
+## 🌟 Key Capabilities
 
-### 1. Dedicated Multi-Goal Trackers
-- **🇩🇪 A1 German Mastery (50 Days)**: Daily grammar, book lessons, teach-back videos, and speaking exercises.
-- **📘 English Fluency Pro (100 Days)**: Vocabulary acquisition, podcast/video input, conversation practice, and sentence drafting.
-- **🌿 Health & Vitality (100 Days)**: Movement, nutrition tracking, water intake, mindfulness, sleep, and metric logging.
+### 1. Dedicated Multi-Goal Roadmaps
+- **🇩🇪 A1 German Mastery (50 Days)**: Daily lessons, grammar exercises, themed song links, and speaking teach-back videos.
+- **📘 English Fluency Pro (100 Days)**: Speaking practice, vocabulary acquisition, idioms, and speech reflection notes.
+- **🌿 Health & Vitality (100 Days)**: Daily movement, physical metric logging (pushups, squats, water, steps, running), and 100-day target milestones.
 
-### 2. Challenges & Habit Sprints
-- **Digital Live Countdown (`D:HH:MM:SS`)**: Live second-by-second countdown timer.
-- **Active Sprint Limit**: Enforces a strict maximum of **5 active challenges** to keep focus razor-sharp.
-- **Challenge Rewards**: Attach custom rewards (e.g. *Cheat Meal Weekend*, *New Running Shoes*, *Spa Day*).
-- **Reflection Notes & Redemption**: When a sprint finishes, claim the reward, record reflections, and trigger celebratory confetti.
-- **Archival System**: Move completed or expired sprints to a collapsible archive, freeing up active sprint slots.
+### 2. Today's Command Center & "Edit Mode"
+- **✏️ Edit Mode**: Modify Day Titles directly (e.g. customized curriculum names) and edit task labels inline. All changes sync in real-time to MySQL.
+- **Interactive Checklist**: Instant checkbox status toggle with celebration fireworks when all daily tasks are completed.
+- **Custom Goals**: Add personal one-off action items for any specific date.
+- **Quick Health Logger**: Log daily physical stats and evening reflections as you type.
 
-### 3. Full-Screen Immersive Experience
-- **Dedicated Navigation Bar**: Fast switching between Dashboard, German, English, and Health roadmaps.
-- **Dark / Light Theme**: Seamless switching with instant local persistence.
-- **One-Click Full-Screen Mode (`⛶`)**: Native browser fullscreen API integration.
-- **Real-Time MySQL Persistence**: Instant automated sync for daily completions, notes, metrics, and rewards.
+### 3. Challenges & Habit Sprints
+- **Digital Live Countdown (`D:HH:MM:SS`)**: Second-by-second countdown clock for each sprint.
+- **5-Sprint Limit**: Enforces maximum 5 active challenges for laser focus.
+- **Custom Rewards & Notes**: Redeem rewards upon completion with attached victory notes.
+- **Archival System**: Move completed sprints to archive and restore whenever needed.
+
+### 4. Full-Screen & Theme Customization
+- **Theme Toggle**: Seamless switching between curated Dark and Light modes.
+- **Native Fullscreen (`⛶`)**: Immersive distraction-free execution mode.
 
 ---
 
 ## 🛠️ Architecture & Tech Stack
 
-- **Backend**: Native Object-Oriented PHP (PSR-compliant architecture with `Database` Singleton, Repository pattern, `ApiController`, and standardized `ApiResponse`).
-- **Database**: MySQL (`goal_tracker_db` schema with auto-migration and socket fallback).
-- **Frontend**: React 18 (CDN/UMD), Vanilla CSS with custom CSS variables, Google Fonts (`Outfit`, `Plus Jakarta Sans`), and Canvas Confetti.
+```
+Goal_tracker/
+├── backend/                 # Object-Oriented PHP REST API (Port 8085)
+│   ├── classes/
+│   │   ├── ApiController.php        # Request routing & validation
+│   │   ├── ApiResponse.php          # Standardized JSON response formatting
+│   │   ├── ChallengeRepository.php  # Data access for habit sprints
+│   │   ├── DailyTaskRepository.php  # Data access for today's tasks
+│   │   ├── Database.php             # Singleton PDO & schema migrations
+│   │   └── TrackerRepository.php    # Data access for trackers, days, goals
+│   ├── api.php                      # REST API entry point
+│   ├── db.php                       # Database bootstrap & class autoloader
+│   └── router.php                   # Local PHP dev server router
+│
+├── frontend/                # Standalone React Application (Port 5173)
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── Navbar.jsx           # Top navigation, theme switcher, fullscreen
+│   │   │   ├── Dashboard.jsx        # Roadmaps overview, stats, habit sprints
+│   │   │   ├── TodayTasks.jsx       # Today's tasks with Edit Mode & health logger
+│   │   │   ├── GermanRoadmap.jsx    # 50-day German interactive curriculum
+│   │   │   ├── EnglishRoadmap.jsx   # 100-day English interactive curriculum
+│   │   │   └── HealthRoadmap.jsx    # 100-day Health targets & rewards
+│   │   ├── data/
+│   │   │   └── lessonsData.js       # Curricula for German, English, and Health
+│   │   ├── api.js                   # REST API client & confetti helper
+│   │   ├── App.jsx                  # Main application & routing container
+│   │   ├── index.css                # Design system & dark/light theme tokens
+│   │   └── main.jsx                 # React root renderer
+│   ├── vite.config.js               # Vite config with backend API proxy
+│   └── package.json                 # React dependencies
+│
+├── api.php                  # Root proxy delegating to backend/api.php
+├── db.php                   # Root proxy delegating to backend/db.php
+└── index.php                # Root redirector to React frontend (Port 5173)
+```
 
 ---
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-- PHP 8.0+
-- MySQL / MariaDB (e.g., via XAMPP or native service)
-
-### Setup Instructions
-
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/pratap7/goal-tracker.git
-   cd goal-tracker
-   ```
-
-2. **Configure Database:**
-   Ensure MySQL is running on `127.0.0.1:3306`. By default, `classes/Database.php` connects with:
-   - Host: `127.0.0.1`
-   - Port: `3306`
-   - User: `root`
-   - Password: `""` (empty)
-   - Database: `goal_tracker_db`
-
-   *(The application automatically creates the database and all required tables upon first request).*
-
-3. **Start the Development Server:**
-   ```bash
-   php -S 127.0.0.1:8085 router.php
-   ```
-
-4. **Open in Browser:**
-   Visit:
-   ```
-   http://127.0.0.1:8085/dashboard.php
-   ```
+- **Node.js** 18+ and **npm**
+- **PHP** 8.0+
+- **MySQL / MariaDB** (running on `127.0.0.1:3306`)
 
 ---
 
-## 📂 Project Structure
-
+### Step 1: Start Backend (PHP)
+From the project root:
+```bash
+php -S 127.0.0.1:8085
 ```
-Goal_tracker/
-├── api.php                  # RESTful API entry point (dispatches ApiController)
-├── classes/                 # OOP PHP Architecture
-│   ├── ApiController.php        # Request router & validation controller
-│   ├── ApiResponse.php          # Standardized JSON response handler
-│   ├── ChallengeRepository.php  # Data access layer for habit sprint challenges
-│   ├── DailyTaskRepository.php  # Data access layer for today's custom tasks
-│   ├── Database.php             # Singleton PDO connection manager & schema migration
-│   └── TrackerRepository.php    # Data access layer for trackers, days, goals, rewards
-├── common.js                # Shared helpers (API fetch, theme, fullscreen, confetti)
-├── dashboard.php            # Main dashboard with roadmap cards & habit sprints
-├── db.php                   # Database bootstrap, autoloader & legacy wrappers
-├── english.php              # 100-Day English fluency roadmap
-├── german.php               # 50-Day A1 German roadmap
-├── health.php               # 100-Day Health & vitality roadmap
-├── index.php                # Entry point redirecting to dashboard.php
-├── navbar.php               # Reusable top navigation bar
-├── router.php               # Local PHP dev server router
-├── style.css                # Complete styling & design system
-└── today.php                # Today's Command Center with Edit Mode
+*The backend automatically connects to MySQL, initializes the `goal_tracker_db` database, and executes all required table migrations.*
+
+---
+
+### Step 2: Start Frontend (React)
+Open a second terminal:
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+---
+
+### Step 3: Open in Browser
+Visit:
+```
+http://127.0.0.1:5173/
 ```
 
 ---
 
 ## 📄 License
-MIT License. Built with passion for personal growth and habit mastery.
+MIT License. Built for consistency, focus, and habit mastery.
