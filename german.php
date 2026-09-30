@@ -145,6 +145,7 @@ function GermanRoadmap() {
           day: dayNum,
           tasks: newData.tasks,
           note: newData.note,
+          customTitle: newData.customTitle || null,
           doneTasks: done,
           totalTasks: total,
           isCompleted,
@@ -355,7 +356,7 @@ function GermanRoadmap() {
           ),
           React.createElement(GermanDayCard, {
             dayNum,
-            topic: lesson[0],
+            topic: dayData.customTitle || lesson[0],
             songIdea: lesson[1],
             dayDate,
             dayData,
@@ -415,6 +416,17 @@ function GermanDayCard({ dayNum, topic, songIdea, dayDate, dayData, updateDay })
     ),
 
     open && React.createElement("div", { className: "day-card-body" },
+      React.createElement("div", { style: { marginBottom: "14px", display: "flex", alignItems: "center", gap: "10px" } },
+        React.createElement("span", { style: { fontSize: "0.8rem", fontWeight: 700, color: "var(--text-muted)", whiteSpace: "nowrap" } }, "✏️ Day Title:"),
+        React.createElement("input", {
+          type: "text",
+          className: "edit-day-title-input",
+          style: { flex: 1, padding: "6px 12px", fontSize: "0.88rem" },
+          value: dayData.customTitle !== undefined && dayData.customTitle !== null && dayData.customTitle !== "" ? dayData.customTitle : topic,
+          onChange: (e) => updateDay({ ...dayData, customTitle: e.target.value }),
+          placeholder: "Custom Day Title..."
+        })
+      ),
       songIdea && React.createElement("div", { className: "learning-tip-box" },
         React.createElement("span", null, "🎵"),
         React.createElement("div", null,

@@ -100,6 +100,7 @@ function TodayPage() {
   const [todayReflection, setTodayReflection] = useState("");
   const [healthMetrics, setHealthMetrics] = useState({ steps: "", water: "", sleepTime: "", weight: "", pushups: "" });
   const [selectedDayOverride, setSelectedDayOverride] = useState({ german: null, english: null, health: null });
+  const [isEditMode, setIsEditMode] = useState(false);
 
   // Load all data
   const loadData = useCallback(async () => {
@@ -139,6 +140,22 @@ function TodayPage() {
     }
   }, [daysData, healthDayNum]);
 
+  // Day Titles with fallback to lessons
+  const getDayTitle = (trackerId, dayNum) => {
+    const saved = daysData[trackerId]?.[dayNum]?.customTitle;
+    if (saved && saved.trim()) return saved;
+    if (trackerId === 'german') {
+      return GERMAN_LESSONS[dayNum - 1] ? GERMAN_LESSONS[dayNum - 1][0] : `German Lesson Day ${dayNum}`;
+    }
+    if (trackerId === 'english') {
+      return ENGLISH_LESSONS[dayNum - 1] ? ENGLISH_LESSONS[dayNum - 1][0] : `English Lesson Day ${dayNum}`;
+    }
+    if (trackerId === 'health') {
+      return HEALTH_LESSONS[dayNum - 1] ? HEALTH_LESSONS[dayNum - 1][0] : `Vitality Day ${dayNum}`;
+    }
+    return `Day ${dayNum}`;
+  };
+
   // Build unified tasks list
   const unifiedTasks = useMemo(() => {
     const list = [];
@@ -146,7 +163,7 @@ function TodayPage() {
     // 1. German A1 Tasks
     const gDayData = daysData.german?.[germanDayNum];
     const gTasks = gDayData?.tasks || DEFAULT_GERMAN_TASKS.map(label => ({ label, done: false }));
-    const gTopic = GERMAN_LESSONS[germanDayNum - 1] ? GERMAN_LESSONS[germanDayNum - 1][0] : `German Lesson Day ${germanDayNum}`;
+    const gTopic = gDayData?.customTitle || (GERMAN_LESSONS[germanDayNum - 1] ? GERMAN_LESSONS[germanDayNum - 1][0] : `German Lesson Day ${germanDayNum}`);
     gTasks.forEach((t, idx) => {
       list.push({
         id: `german_${germanDayNum}_${idx}`,
@@ -165,7 +182,7 @@ function TodayPage() {
     // 2. English Fluency Tasks
     const eDayData = daysData.english?.[englishDayNum];
     const eTasks = eDayData?.tasks || DEFAULT_ENGLISH_TASKS.map(label => ({ label, done: false }));
-    const eTopic = ENGLISH_LESSONS[englishDayNum - 1] ? ENGLISH_LESSONS[englishDayNum - 1][0] : `English Lesson Day ${englishDayNum}`;
+    const eTopic = eDayData?.customTitle || (ENGLISH_LESSONS[englishDayNum - 1] ? ENGLISH_LESSONS[englishDayNum - 1][0] : `English Lesson Day ${englishDayNum}`);
     eTasks.forEach((t, idx) => {
       list.push({
         id: `english_${englishDayNum}_${idx}`,
@@ -184,7 +201,7 @@ function TodayPage() {
     // 3. Health & Vitality Tasks
     const hDayData = daysData.health?.[healthDayNum];
     const hTasks = hDayData?.tasks || DEFAULT_HEALTH_TASKS.map(label => ({ label, done: false }));
-    const hTopic = HEALTH_LESSONS[healthDayNum - 1] ? HEALTH_LESSONS[healthDayNum - 1][0] : `Vitality Day ${healthDayNum}`;
+    const hTopic = hDayData?.customTitle || (HEALTH_LESSONS[healthDayNum - 1] ? HEALTH_LESSONS[healthDayNum - 1][0] : `Vitality Day ${healthDayNum}`);
     hTasks.forEach((t, idx) => {
       list.push({
         id: `health_${healthDayNum}_${idx}`,
@@ -410,6 +427,121 @@ function TodayPage() {
     }, 600);
   };
 
+  // Edit day title (German, English, Health)
+  const handleEditDayTitle = (trackerId, dayNum, newTitle) => {
+    const curDay = daysData[trackerId]?.[dayNum] || {};
+    setDaysData(prev => ({
+      ...prev,
+      [trackerId]: {
+        ...(prev[trackerId] || {}),
+        [dayNum]: { ...curDay, customTitle: newTitle }
+      }
+    }));
+
+    clearTimeout(window[`_gt_title_timer_${trackerId}_${dayNum}`]);
+    window[`_gt_title_timer_${trackerId}_${dayNum}`] = setTimeout(async () => {
+      await fetchApi('save_day_title', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trackerId, day: dayNum, title: newTitle })
+      });
+      showToast("Day title saved to MySQL ✓");
+    }, 600);
+  };
+
+  // Edit task label in a day
+  const handleEditTaskLabel = (trackerId, dayNum, taskIdx, newLabel) => {
+    const curDay = daysData[trackerId]?.[dayNum] || {};
+    const defaultList = trackerId === 'german' ? DEFAULT_GERMAN_TASKS :
+                        trackerId === 'english' ? DEFAULT_ENGLISH_TASKS : DEFAULT_HEALTH_TASKS;
+    const curTasks = (curDay.tasks || defaultList.map(l => ({ label: l, done: false })))
+      .map((t, i) => i === taskIdx ? { ...t, label: newLabel } : t);
+
+    setDaysData(prev => ({
+      ...prev,
+      [trackerId]: {
+        ...(prev[trackerId] || {}),
+        [dayNum]: { ...curDay, tasks: curTasks }
+      }
+    }));
+
+    clearTimeout(window[`_gt_task_label_${trackerId}_${dayNum}`]);
+    window[`_gt_task_label_${trackerId}_${dayNum}`] = setTimeout(async () => {
+      await fetchApi('save_day_tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trackerId, day: dayNum, tasks: curTasks })
+      });
+    }, 600);
+  };
+
+  // Delete task from day
+  const handleDeleteDayTask = async (trackerId, dayNum, taskIdx) => {
+    const curDay = daysData[trackerId]?.[dayNum] || {};
+    const defaultList = trackerId === 'german' ? DEFAULT_GERMAN_TASKS :
+                        trackerId === 'english' ? DEFAULT_ENGLISH_TASKS : DEFAULT_HEALTH_TASKS;
+    const curTasks = (curDay.tasks || defaultList.map(l => ({ label: l, done: false })))
+      .filter((_, i) => i !== taskIdx);
+
+    setDaysData(prev => ({
+      ...prev,
+      [trackerId]: {
+        ...(prev[trackerId] || {}),
+        [dayNum]: { ...curDay, tasks: curTasks }
+      }
+    }));
+
+    showToast("Task removed ✓");
+    await fetchApi('save_day_tasks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ trackerId, day: dayNum, tasks: curTasks })
+    });
+  };
+
+  // Add task to day
+  const handleAddNewDayTask = async (trackerId, dayNum) => {
+    const text = prompt(`Enter new task for ${trackerId.toUpperCase()} Day ${dayNum}:`);
+    if (!text || !text.trim()) return;
+
+    const curDay = daysData[trackerId]?.[dayNum] || {};
+    const defaultList = trackerId === 'german' ? DEFAULT_GERMAN_TASKS :
+                        trackerId === 'english' ? DEFAULT_ENGLISH_TASKS : DEFAULT_HEALTH_TASKS;
+    const curTasks = [
+      ...(curDay.tasks || defaultList.map(l => ({ label: l, done: false }))),
+      { label: text.trim(), done: false }
+    ];
+
+    setDaysData(prev => ({
+      ...prev,
+      [trackerId]: {
+        ...(prev[trackerId] || {}),
+        [dayNum]: { ...curDay, tasks: curTasks }
+      }
+    }));
+
+    showToast(`Added task to Day ${dayNum} ✓`);
+    await fetchApi('save_day_tasks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ trackerId, day: dayNum, tasks: curTasks })
+    });
+  };
+
+  // Edit custom task title
+  const handleEditCustomTitle = (id, newTitle) => {
+    const curTask = dailyTasks.find(dt => dt.id === id);
+    setDailyTasks(prev => prev.map(dt => dt.id === id ? { ...dt, title: newTitle } : dt));
+    clearTimeout(window[`_gt_custom_edit_${id}`]);
+    window[`_gt_custom_edit_${id}`] = setTimeout(async () => {
+      await fetchApi('save_daily_task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, title: newTitle, taskDate: selectedDate, done: curTask ? curTask.done : false })
+      });
+    }, 600);
+  };
+
   // Date shifting
   const shiftDate = (delta) => {
     const d = new Date(selectedDate + 'T00:00:00');
@@ -500,7 +632,7 @@ function TodayPage() {
       )
     ),
 
-    /* Controls: Category Filter + Status Filter */
+    /* Controls: Category Filter + Status Filter + Edit Mode Button */
     React.createElement("div", { className: "controls-bar" },
       React.createElement("div", { className: "filter-chips-wrap" },
         [
@@ -520,7 +652,8 @@ function TodayPage() {
         )
       ),
 
-      React.createElement("div", { style: { display: "flex", gap: "6px" } },
+      React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" } },
+        /* Status Filters */
         [
           { id: 'all', label: 'All Status' },
           { id: 'pending', label: `Pending (${pendingCount})` },
@@ -533,77 +666,265 @@ function TodayPage() {
             style: statusFilter === st.id ? { background: "var(--border-focus)", color: "#fff", borderColor: "var(--border-focus)" } : {},
             onClick: () => setStatusFilter(st.id)
           }, st.label)
+        ),
+
+        /* Edit Mode Button */
+        React.createElement("button", {
+          type: "button",
+          className: `btn-edit-mode ${isEditMode ? 'active' : ''}`,
+          onClick: () => {
+            const next = !isEditMode;
+            setIsEditMode(next);
+            showToast(next ? "✏️ Edit Mode Active: customize day titles & tasks directly" : "Exited Edit Mode ✓");
+          }
+        },
+          isEditMode ? "✓ Done Editing" : "✏️ Edit Mode"
         )
       )
     ),
 
-    /* Task List */
-    React.createElement("div", { className: "today-tasks-container", style: { marginTop: "16px" } },
-      filteredTasks.length === 0 ? React.createElement("div", {
-        style: {
-          textAlign: "center",
-          padding: "48px 20px",
-          background: "var(--bg-card)",
-          borderRadius: "var(--radius-lg)",
-          border: "1px dashed var(--border)",
-          color: "var(--text-muted)"
-        }
-      },
-        React.createElement("div", { style: { fontSize: "2rem", marginBottom: "8px" } }, "🎉"),
-        React.createElement("div", { style: { fontWeight: 700, fontSize: "1rem", color: "var(--text-main)" } }, "No matching tasks found"),
-        React.createElement("div", { style: { fontSize: "0.82rem", marginTop: "4px" } }, "Adjust your filters or add a new task for today below.")
-      ) : filteredTasks.map(item => {
-        return React.createElement("div", {
-          key: item.id,
-          className: `today-task-card ${item.done ? 'done' : ''}`,
-          onClick: () => handleToggleTask(item)
-        },
-          React.createElement("div", { className: "today-task-main" },
-            /* Checkbox */
-            React.createElement("div", {
-              className: "today-task-checkbox",
-              title: item.done ? "Click to mark pending" : "Click to mark completed"
-            }, item.done ? "✓" : null),
+    /* Edit Mode Alert Banner */
+    isEditMode && React.createElement("div", { className: "edit-mode-banner" },
+      React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "8px" } },
+        React.createElement("span", { style: { fontSize: "1.2rem" } }, "✏️"),
+        React.createElement("div", null,
+          React.createElement("strong", null, "Edit Mode Active: "),
+          "You can modify Day Titles, edit task descriptions, delete tasks, and add new tasks. All edits auto-save directly to MySQL!"
+        )
+      ),
+      React.createElement("button", {
+        type: "button",
+        className: "btn-edit-mode active",
+        style: { padding: "4px 12px", fontSize: "0.76rem" },
+        onClick: () => setIsEditMode(false)
+      }, "Exit Edit Mode ✓")
+    ),
 
-            /* Info */
-            React.createElement("div", { className: "today-task-info" },
-              React.createElement("div", { className: "today-badge-row" },
-                React.createElement("span", { className: `today-cat-badge ${item.badgeClass}` }, item.categoryName),
-                item.dayNum ? React.createElement("span", { style: { fontSize: "0.72rem", color: "var(--text-dim)", fontWeight: 700 } }, `Day ${item.dayNum}`) : null,
-                React.createElement("span", { className: "today-task-topic" }, `• ${item.topic}`)
-              ),
-              React.createElement("div", { className: "today-task-title" }, item.label)
-            )
-          ),
-
-          /* Right Side Actions / Link */
-          React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 } },
-            item.link ? React.createElement("a", {
-              href: item.link,
-              style: {
-                fontSize: "0.75rem",
-                color: "var(--text-muted)",
-                textDecoration: "none",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "4px",
-                padding: "4px 8px",
-                borderRadius: "4px",
-                background: "var(--bg-surface)"
-              },
-              onClick: (e) => e.stopPropagation(),
-              title: "Open dedicated tracker roadmap"
-            }, "Open →") : null,
-
-            item.type === 'custom' && React.createElement("button", {
+    /* Main Content: Edit Mode View OR Normal Checklist View */
+    isEditMode ? (
+      /* EDIT MODE CONTENT */
+      React.createElement("div", { style: { marginTop: "16px", display: "flex", flexDirection: "column", gap: "20px" } },
+        /* 1. German A1 Section */
+        (categoryFilter === 'all' || categoryFilter === 'german') && React.createElement("div", { className: "challenges-container", style: { marginTop: 0 } },
+          React.createElement("div", { className: "edit-day-header-box" },
+            React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "8px" } },
+              React.createElement("span", { className: "today-cat-badge german" }, "🇩🇪 German A1"),
+              React.createElement("span", { style: { fontWeight: 800, fontSize: "0.95rem" } }, `Day ${germanDayNum} Title:`)
+            ),
+            React.createElement("input", {
+              type: "text",
+              className: "edit-day-title-input",
+              value: getDayTitle('german', germanDayNum),
+              onChange: (e) => handleEditDayTitle('german', germanDayNum, e.target.value),
+              placeholder: "Enter German Day Title..."
+            }),
+            React.createElement("button", {
               type: "button",
-              className: "challenge-del-btn",
-              title: "Delete task",
-              onClick: (e) => handleDeleteCustom(item.customId, e)
-            }, "×")
+              className: "btn-add-day-task",
+              onClick: () => handleAddNewDayTask('german', germanDayNum)
+            }, "+ Add Task")
+          ),
+          React.createElement("div", { className: "today-tasks-container" },
+            (daysData.german?.[germanDayNum]?.tasks || DEFAULT_GERMAN_TASKS.map(l => ({ label: l, done: false }))).map((task, idx) =>
+              React.createElement("div", { key: idx, className: "today-task-card", style: { padding: "10px 14px" } },
+                React.createElement("span", { style: { color: "var(--text-dim)", fontSize: "0.8rem", fontWeight: 700 } }, `${idx + 1}.`),
+                React.createElement("input", {
+                  type: "text",
+                  className: "edit-task-input",
+                  value: task.label,
+                  onChange: (e) => handleEditTaskLabel('german', germanDayNum, idx, e.target.value)
+                }),
+                React.createElement("button", {
+                  type: "button",
+                  className: "btn-delete-task",
+                  title: "Delete task from this day",
+                  onClick: () => handleDeleteDayTask('german', germanDayNum, idx)
+                }, "🗑")
+              )
+            )
           )
-        );
-      })
+        ),
+
+        /* 2. English Fluency Section */
+        (categoryFilter === 'all' || categoryFilter === 'english') && React.createElement("div", { className: "challenges-container", style: { marginTop: 0 } },
+          React.createElement("div", { className: "edit-day-header-box" },
+            React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "8px" } },
+              React.createElement("span", { className: "today-cat-badge english" }, "📘 English Pro"),
+              React.createElement("span", { style: { fontWeight: 800, fontSize: "0.95rem" } }, `Day ${englishDayNum} Title:`)
+            ),
+            React.createElement("input", {
+              type: "text",
+              className: "edit-day-title-input",
+              value: getDayTitle('english', englishDayNum),
+              onChange: (e) => handleEditDayTitle('english', englishDayNum, e.target.value),
+              placeholder: "Enter English Day Title..."
+            }),
+            React.createElement("button", {
+              type: "button",
+              className: "btn-add-day-task",
+              onClick: () => handleAddNewDayTask('english', englishDayNum)
+            }, "+ Add Task")
+          ),
+          React.createElement("div", { className: "today-tasks-container" },
+            (daysData.english?.[englishDayNum]?.tasks || DEFAULT_ENGLISH_TASKS.map(l => ({ label: l, done: false }))).map((task, idx) =>
+              React.createElement("div", { key: idx, className: "today-task-card", style: { padding: "10px 14px" } },
+                React.createElement("span", { style: { color: "var(--text-dim)", fontSize: "0.8rem", fontWeight: 700 } }, `${idx + 1}.`),
+                React.createElement("input", {
+                  type: "text",
+                  className: "edit-task-input",
+                  value: task.label,
+                  onChange: (e) => handleEditTaskLabel('english', englishDayNum, idx, e.target.value)
+                }),
+                React.createElement("button", {
+                  type: "button",
+                  className: "btn-delete-task",
+                  title: "Delete task from this day",
+                  onClick: () => handleDeleteDayTask('english', englishDayNum, idx)
+                }, "🗑")
+              )
+            )
+          )
+        ),
+
+        /* 3. Health & Vitality Section */
+        (categoryFilter === 'all' || categoryFilter === 'health') && React.createElement("div", { className: "challenges-container", style: { marginTop: 0 } },
+          React.createElement("div", { className: "edit-day-header-box" },
+            React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "8px" } },
+              React.createElement("span", { className: "today-cat-badge health" }, "🌿 Health 100"),
+              React.createElement("span", { style: { fontWeight: 800, fontSize: "0.95rem" } }, `Day ${healthDayNum} Title:`)
+            ),
+            React.createElement("input", {
+              type: "text",
+              className: "edit-day-title-input",
+              value: getDayTitle('health', healthDayNum),
+              onChange: (e) => handleEditDayTitle('health', healthDayNum, e.target.value),
+              placeholder: "Enter Health Day Title..."
+            }),
+            React.createElement("button", {
+              type: "button",
+              className: "btn-add-day-task",
+              onClick: () => handleAddNewDayTask('health', healthDayNum)
+            }, "+ Add Task")
+          ),
+          React.createElement("div", { className: "today-tasks-container" },
+            (daysData.health?.[healthDayNum]?.tasks || DEFAULT_HEALTH_TASKS.map(l => ({ label: l, done: false }))).map((task, idx) =>
+              React.createElement("div", { key: idx, className: "today-task-card", style: { padding: "10px 14px" } },
+                React.createElement("span", { style: { color: "var(--text-dim)", fontSize: "0.8rem", fontWeight: 700 } }, `${idx + 1}.`),
+                React.createElement("input", {
+                  type: "text",
+                  className: "edit-task-input",
+                  value: task.label,
+                  onChange: (e) => handleEditTaskLabel('health', healthDayNum, idx, e.target.value)
+                }),
+                React.createElement("button", {
+                  type: "button",
+                  className: "btn-delete-task",
+                  title: "Delete task from this day",
+                  onClick: () => handleDeleteDayTask('health', healthDayNum, idx)
+                }, "🗑")
+              )
+            )
+          )
+        ),
+
+        /* 4. Custom Tasks Section */
+        (categoryFilter === 'all' || categoryFilter === 'custom') && React.createElement("div", { className: "challenges-container", style: { marginTop: 0 } },
+          React.createElement("div", { style: { fontWeight: 800, fontSize: "0.95rem", marginBottom: "12px", display: "flex", alignItems: "center", gap: "6px" } },
+            "✨ Custom Personal Tasks for Today",
+            React.createElement("span", { style: { fontSize: "0.76rem", color: "var(--text-muted)", fontWeight: 500 } }, "(Click title to edit)")
+          ),
+          React.createElement("div", { className: "today-tasks-container" },
+            dailyTasks.filter(dt => dt.taskDate === selectedDate).length === 0 ? (
+              React.createElement("div", { style: { fontSize: "0.82rem", color: "var(--text-dim)", fontStyle: "italic", padding: "8px 0" } }, "No custom tasks added for this date yet.")
+            ) : dailyTasks.filter(dt => dt.taskDate === selectedDate).map(dt =>
+              React.createElement("div", { key: dt.id, className: "today-task-card", style: { padding: "10px 14px" } },
+                React.createElement("span", { className: "today-cat-badge custom" }, "Custom"),
+                React.createElement("input", {
+                  type: "text",
+                  className: "edit-task-input",
+                  value: dt.title,
+                  onChange: (e) => handleEditCustomTitle(dt.id, e.target.value)
+                }),
+                React.createElement("button", {
+                  type: "button",
+                  className: "btn-delete-task",
+                  title: "Delete custom task",
+                  onClick: (e) => handleDeleteCustom(dt.id, e)
+                }, "🗑")
+              )
+            )
+          )
+        )
+      )
+    ) : (
+      /* NORMAL INTERACTIVE CHECKLIST VIEW */
+      React.createElement("div", { className: "today-tasks-container", style: { marginTop: "16px" } },
+        filteredTasks.length === 0 ? React.createElement("div", {
+          style: {
+            textAlign: "center",
+            padding: "48px 20px",
+            background: "var(--bg-card)",
+            borderRadius: "var(--radius-lg)",
+            border: "1px dashed var(--border)",
+            color: "var(--text-muted)"
+          }
+        },
+          React.createElement("div", { style: { fontSize: "2rem", marginBottom: "8px" } }, "🎉"),
+          React.createElement("div", { style: { fontWeight: 700, fontSize: "1rem", color: "var(--text-main)" } }, "No matching tasks found"),
+          React.createElement("div", { style: { fontSize: "0.82rem", marginTop: "4px" } }, "Adjust your filters or add a new task for today below.")
+        ) : filteredTasks.map(item => {
+          return React.createElement("div", {
+            key: item.id,
+            className: `today-task-card ${item.done ? 'done' : ''}`,
+            onClick: () => handleToggleTask(item)
+          },
+            React.createElement("div", { className: "today-task-main" },
+              /* Checkbox */
+              React.createElement("div", {
+                className: "today-task-checkbox",
+                title: item.done ? "Click to mark pending" : "Click to mark completed"
+              }, item.done ? "✓" : null),
+
+              /* Info */
+              React.createElement("div", { className: "today-task-info" },
+                React.createElement("div", { className: "today-badge-row" },
+                  React.createElement("span", { className: `today-cat-badge ${item.badgeClass}` }, item.categoryName),
+                  item.dayNum ? React.createElement("span", { style: { fontSize: "0.72rem", color: "var(--text-dim)", fontWeight: 700 } }, `Day ${item.dayNum}`) : null,
+                  React.createElement("span", { className: "today-task-topic" }, `• ${item.topic}`)
+                ),
+                React.createElement("div", { className: "today-task-title" }, item.label)
+              )
+            ),
+
+            /* Right Side Actions / Link */
+            React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 } },
+              item.link ? React.createElement("a", {
+                href: item.link,
+                style: {
+                  fontSize: "0.75rem",
+                  color: "var(--text-muted)",
+                  textDecoration: "none",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  padding: "4px 8px",
+                  borderRadius: "4px",
+                  background: "var(--bg-surface)"
+                },
+                onClick: (e) => e.stopPropagation(),
+                title: "Open dedicated tracker roadmap"
+              }, "Open →") : null,
+
+              item.type === 'custom' && React.createElement("button", {
+                type: "button",
+                className: "challenge-del-btn",
+                title: "Delete task",
+                onClick: (e) => handleDeleteCustom(item.customId, e)
+              }, "×")
+            )
+          );
+        })
+      )
     ),
 
     /* Add Custom Task Form */

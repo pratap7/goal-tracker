@@ -74,7 +74,7 @@ try {
             }
 
             // 2. Days
-            $stmt = $pdo->query("SELECT tracker_id, day_number, tasks, note, metrics, done_tasks, total_tasks, is_completed, log_date FROM tracker_days ORDER BY tracker_id, day_number ASC");
+            $stmt = $pdo->query("SELECT tracker_id, day_number, tasks, note, metrics, done_tasks, total_tasks, is_completed, log_date, custom_title FROM tracker_days ORDER BY tracker_id, day_number ASC");
             $daysRows = $stmt->fetchAll();
             $days = [];
             foreach ($daysRows as $row) {
@@ -93,7 +93,8 @@ try {
                     'doneTasks' => (int)$row['done_tasks'],
                     'totalTasks' => (int)$row['total_tasks'],
                     'isCompleted' => (bool)$row['is_completed'],
-                    'logDate' => $row['log_date']
+                    'logDate' => $row['log_date'],
+                    'customTitle' => $row['custom_title'] ?? ''
                 ];
             }
 
@@ -177,10 +178,11 @@ try {
             $totalTasks = (int)($input['totalTasks'] ?? 0);
             $isCompleted = !empty($input['isCompleted']) ? 1 : 0;
             $logDate = !empty($input['logDate']) ? $input['logDate'] : date('Y-m-d');
+            $customTitle = isset($input['customTitle']) ? trim($input['customTitle']) : null;
 
             $sql = "INSERT INTO tracker_days 
-                    (tracker_id, day_number, tasks, note, metrics, done_tasks, total_tasks, is_completed, log_date, updated_at)
-                    VALUES (:tid, :day, :tasks, :note, :metrics, :done, :total, :completed, :logdate, NOW())
+                    (tracker_id, day_number, tasks, note, metrics, done_tasks, total_tasks, is_completed, log_date, custom_title, updated_at)
+                    VALUES (:tid, :day, :tasks, :note, :metrics, :done, :total, :completed, :logdate, :ctitle, NOW())
                     ON DUPLICATE KEY UPDATE 
                         tasks = VALUES(tasks),
                         note = VALUES(note),
@@ -189,6 +191,7 @@ try {
                         total_tasks = VALUES(total_tasks),
                         is_completed = VALUES(is_completed),
                         log_date = VALUES(log_date),
+                        custom_title = IFNULL(VALUES(custom_title), custom_title),
                         updated_at = NOW()";
 
             $stmt = $pdo->prepare($sql);
@@ -201,7 +204,8 @@ try {
                 ':done' => $doneTasks,
                 ':total' => $totalTasks,
                 ':completed' => $isCompleted,
-                ':logdate' => $logDate
+                ':logdate' => $logDate,
+                ':ctitle' => $customTitle
             ]);
 
             jsonResponse([
@@ -209,6 +213,57 @@ try {
                 'message' => "Saved day {$day} for tracker {$trackerId}",
                 'savedAt' => date('Y-m-d H:i:s')
             ]);
+            break;
+        }
+
+        case 'save_day_title': {
+            $input = getJsonInput();
+            $trackerId = trim($input['trackerId'] ?? '');
+            $day = (int)($input['day'] ?? 0);
+            $title = trim($input['title'] ?? '');
+            if (!$trackerId || $day < 1) {
+                jsonResponse(['success' => false, 'error' => 'Missing trackerId or day'], 400);
+            }
+            $sql = "INSERT INTO tracker_days (tracker_id, day_number, custom_title, updated_at)
+                    VALUES (:tid, :day, :title, NOW())
+                    ON DUPLICATE KEY UPDATE custom_title = :title, updated_at = NOW()";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([':tid' => $trackerId, ':day' => $day, ':title' => $title]);
+            jsonResponse(['success' => true]);
+            break;
+        }
+
+        case 'save_day_tasks': {
+            $input = getJsonInput();
+            $trackerId = trim($input['trackerId'] ?? '');
+            $day = (int)($input['day'] ?? 0);
+            $tasks = $input['tasks'] ?? [];
+            if (!$trackerId || $day < 1 || !is_array($tasks)) {
+                jsonResponse(['success' => false, 'error' => 'Missing parameters'], 400);
+            }
+            $tasksJson = json_encode($tasks, JSON_UNESCAPED_UNICODE);
+            $doneTasks = count(array_filter($tasks, fn($t) => !empty($t['done'])));
+            $totalTasks = count($tasks);
+            $isCompleted = ($totalTasks > 0 && $doneTasks === $totalTasks) ? 1 : 0;
+
+            $sql = "INSERT INTO tracker_days (tracker_id, day_number, tasks, done_tasks, total_tasks, is_completed, updated_at)
+                    VALUES (:tid, :day, :tasks, :done, :total, :completed, NOW())
+                    ON DUPLICATE KEY UPDATE 
+                        tasks = VALUES(tasks),
+                        done_tasks = VALUES(done_tasks),
+                        total_tasks = VALUES(total_tasks),
+                        is_completed = VALUES(is_completed),
+                        updated_at = NOW()";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([
+                ':tid' => $trackerId,
+                ':day' => $day,
+                ':tasks' => $tasksJson,
+                ':done' => $doneTasks,
+                ':total' => $totalTasks,
+                ':completed' => $isCompleted
+            ]);
+            jsonResponse(['success' => true]);
             break;
         }
 
@@ -480,15 +535,23 @@ try {
             $id = (string)($input['id'] ?? ('dt_' . round(microtime(true) * 1000)));
             $taskDate = (string)($input['taskDate'] ?? date('Y-m-d'));
             $title = trim($input['title'] ?? '');
-            $done = !empty($input['done']) ? 1 : 0;
             if (!$title) {
                 jsonResponse(['success' => false, 'error' => 'Title is required'], 400);
             }
-            $sql = "INSERT INTO daily_tasks (id, task_date, title, done, created_at)
-                    VALUES (:id, :tdate, :title, :done, NOW())
-                    ON DUPLICATE KEY UPDATE title = VALUES(title), done = VALUES(done)";
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute([':id' => $id, ':tdate' => $taskDate, ':title' => $title, ':done' => $done]);
+            if (isset($input['done'])) {
+                $done = !empty($input['done']) ? 1 : 0;
+                $sql = "INSERT INTO daily_tasks (id, task_date, title, done, created_at)
+                        VALUES (:id, :tdate, :title, :done, NOW())
+                        ON DUPLICATE KEY UPDATE title = VALUES(title), done = VALUES(done)";
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute([':id' => $id, ':tdate' => $taskDate, ':title' => $title, ':done' => $done]);
+            } else {
+                $sql = "INSERT INTO daily_tasks (id, task_date, title, done, created_at)
+                        VALUES (:id, :tdate, :title, 0, NOW())
+                        ON DUPLICATE KEY UPDATE title = VALUES(title)";
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute([':id' => $id, ':tdate' => $taskDate, ':title' => $title]);
+            }
             jsonResponse(['success' => true, 'id' => $id]);
             break;
         }

@@ -1816,6 +1816,122 @@ h1, h2, h3, h4 {
   border-color: var(--border-focus);
 }
 
+/* ==========================================================================
+   EDIT MODE STYLES
+   ========================================================================== */
+.btn-edit-mode {
+  background: var(--chip-bg);
+  border: 1px solid var(--border);
+  color: var(--text-main);
+  border-radius: var(--radius-full);
+  padding: 6px 14px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: var(--transition);
+}
+.btn-edit-mode:hover {
+  background: var(--bg-surface);
+  border-color: var(--border-focus);
+}
+.btn-edit-mode.active {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #ffffff;
+  border-color: #f59e0b;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.4);
+}
+.edit-mode-banner {
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px dashed rgba(245, 158, 11, 0.4);
+  border-radius: var(--radius-md);
+  padding: 10px 16px;
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.82rem;
+  color: #f59e0b;
+}
+.edit-day-header-box {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  margin: 18px 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.edit-day-title-input {
+  flex: 1;
+  min-width: 220px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text-main);
+  outline: none;
+}
+.edit-day-title-input:focus {
+  border-color: #f59e0b;
+}
+.edit-task-input {
+  flex: 1;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-main);
+  outline: none;
+  font-family: inherit;
+}
+.edit-task-input:focus {
+  border-color: #f59e0b;
+}
+.btn-delete-task {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 0.95rem;
+  transition: var(--transition);
+}
+.btn-delete-task:hover {
+  color: #f43f5e;
+  background: rgba(244, 63, 94, 0.1);
+}
+.btn-add-day-task {
+  background: var(--bg-card);
+  border: 1px dashed var(--border);
+  color: var(--text-muted);
+  border-radius: var(--radius-md);
+  padding: 8px 14px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  transition: var(--transition);
+}
+.btn-add-day-task:hover {
+  border-color: #f59e0b;
+  color: var(--text-main);
+}
+
 @media (max-width: 768px) {
   .app-wrapper { padding: 14px 12px 60px; }
   .site-nav { flex-wrap: wrap; padding: 12px 14px; }

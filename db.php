@@ -142,4 +142,9 @@ function ensureSchema(PDO $pdo) {
             $pdo->exec("ALTER TABLE challenges ADD COLUMN {$col} {$type}");
         }
     }
+
+    $checkTitle = $pdo->query("SHOW COLUMNS FROM tracker_days LIKE 'custom_title'")->fetch();
+    if (!$checkTitle) {
+        $pdo->exec("ALTER TABLE tracker_days ADD COLUMN custom_title VARCHAR(255) NULL");
+    }
 }

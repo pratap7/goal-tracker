@@ -162,6 +162,7 @@ function HealthRoadmap() {
           tasks: newData.tasks,
           note: newData.note,
           metrics: newData.metrics,
+          customTitle: newData.customTitle || null,
           doneTasks: done,
           totalTasks: total,
           isCompleted,
@@ -407,7 +408,7 @@ function HealthRoadmap() {
           ),
           React.createElement(HealthDayCard, {
             dayNum,
-            topic: lesson[0],
+            topic: dayData.customTitle || lesson[0],
             tip: lesson[1],
             dayDate,
             dayData,
@@ -612,6 +613,17 @@ function HealthDayCard({ dayNum, topic, tip, dayDate, dayData, updateDay }) {
     ),
 
     open && React.createElement("div", { className: "day-card-body" },
+      React.createElement("div", { style: { marginBottom: "14px", display: "flex", alignItems: "center", gap: "10px" } },
+        React.createElement("span", { style: { fontSize: "0.8rem", fontWeight: 700, color: "var(--text-muted)", whiteSpace: "nowrap" } }, "✏️ Day Title:"),
+        React.createElement("input", {
+          type: "text",
+          className: "edit-day-title-input",
+          style: { flex: 1, padding: "6px 12px", fontSize: "0.88rem" },
+          value: dayData.customTitle !== undefined && dayData.customTitle !== null && dayData.customTitle !== "" ? dayData.customTitle : topic,
+          onChange: (e) => updateDay({ ...dayData, customTitle: e.target.value }),
+          placeholder: "Custom Day Title..."
+        })
+      ),
       tip && React.createElement("div", { className: "learning-tip-box" },
         React.createElement("span", null, "✨"),
         React.createElement("div", null,
