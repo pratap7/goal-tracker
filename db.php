@@ -115,6 +115,15 @@ function ensureSchema(PDO $pdo) {
         end_time DATETIME NULL,
         archived_at DATETIME NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+    CREATE TABLE IF NOT EXISTS daily_tasks (
+        id VARCHAR(64) PRIMARY KEY,
+        task_date DATE NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        done TINYINT(1) DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_task_date (task_date)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     ";
 
     $pdo->exec($schema);

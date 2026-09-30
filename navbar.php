@@ -15,6 +15,9 @@ function renderNavbar($activePage = 'dashboard') {
     <a href="dashboard.php" class="nav-link-btn <?= $activePage === 'dashboard' ? 'active' : '' ?>">
       <span>📊</span> <span>Dashboard</span>
     </a>
+    <a href="today.php" class="nav-link-btn <?= $activePage === 'today' ? 'active' : '' ?>">
+      <span>⚡</span> <span>Today</span>
+    </a>
     <a href="german.php" class="nav-link-btn <?= $activePage === 'german' ? 'active' : '' ?>">
       <span>🇩🇪</span> <span>German A1</span>
     </a>

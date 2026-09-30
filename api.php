@@ -134,6 +134,20 @@ try {
                 ];
             }
 
+            // 6. Daily Custom Tasks
+            $stmt = $pdo->query("SELECT id, task_date, title, done, created_at FROM daily_tasks ORDER BY created_at ASC");
+            $dailyTasksRows = $stmt->fetchAll();
+            $dailyTasks = [];
+            foreach ($dailyTasksRows as $drow) {
+                $dailyTasks[] = [
+                    'id' => $drow['id'],
+                    'taskDate' => $drow['task_date'],
+                    'title' => $drow['title'],
+                    'done' => (bool)$drow['done'],
+                    'createdAt' => $drow['created_at']
+                ];
+            }
+
             jsonResponse([
                 'success' => true,
                 'data' => [
@@ -141,7 +155,8 @@ try {
                     'days' => $days,
                     'goals' => $goals,
                     'rewards' => $rewards,
-                    'challenges' => $challenges
+                    'challenges' => $challenges,
+                    'dailyTasks' => $dailyTasks
                 ]
             ]);
             break;
@@ -457,6 +472,49 @@ try {
             $stmt->execute([':id' => $id]);
 
             jsonResponse(['success' => true, 'message' => "Challenge {$id} deleted"]);
+            break;
+        }
+
+        case 'save_daily_task': {
+            $input = getJsonInput();
+            $id = (string)($input['id'] ?? ('dt_' . round(microtime(true) * 1000)));
+            $taskDate = (string)($input['taskDate'] ?? date('Y-m-d'));
+            $title = trim($input['title'] ?? '');
+            $done = !empty($input['done']) ? 1 : 0;
+            if (!$title) {
+                jsonResponse(['success' => false, 'error' => 'Title is required'], 400);
+            }
+            $sql = "INSERT INTO daily_tasks (id, task_date, title, done, created_at)
+                    VALUES (:id, :tdate, :title, :done, NOW())
+                    ON DUPLICATE KEY UPDATE title = VALUES(title), done = VALUES(done)";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([':id' => $id, ':tdate' => $taskDate, ':title' => $title, ':done' => $done]);
+            jsonResponse(['success' => true, 'id' => $id]);
+            break;
+        }
+
+        case 'toggle_daily_task': {
+            $input = getJsonInput();
+            $id = (string)($input['id'] ?? '');
+            $done = !empty($input['done']) ? 1 : 0;
+            if (!$id) {
+                jsonResponse(['success' => false, 'error' => 'Missing task id'], 400);
+            }
+            $stmt = $pdo->prepare("UPDATE daily_tasks SET done = :done WHERE id = :id");
+            $stmt->execute([':done' => $done, ':id' => $id]);
+            jsonResponse(['success' => true]);
+            break;
+        }
+
+        case 'delete_daily_task': {
+            $input = getJsonInput();
+            $id = (string)($input['id'] ?? '');
+            if (!$id) {
+                jsonResponse(['success' => false, 'error' => 'Missing task id'], 400);
+            }
+            $stmt = $pdo->prepare("DELETE FROM daily_tasks WHERE id = :id");
+            $stmt->execute([':id' => $id]);
+            jsonResponse(['success' => true]);
             break;
         }
 
