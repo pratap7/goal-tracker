@@ -32,8 +32,8 @@ A modern, high-performance personal goal and habit management application built 
 
 ## 🛠️ Architecture & Tech Stack
 
-- **Backend**: Native PHP (lightweight REST API in `api.php`, database layer with PDO prepared statements in `db.php`).
-- **Database**: MySQL (`goal_tracker_db` schema with auto-migration).
+- **Backend**: Native Object-Oriented PHP (PSR-compliant architecture with `Database` Singleton, Repository pattern, `ApiController`, and standardized `ApiResponse`).
+- **Database**: MySQL (`goal_tracker_db` schema with auto-migration and socket fallback).
 - **Frontend**: React 18 (CDN/UMD), Vanilla CSS with custom CSS variables, Google Fonts (`Outfit`, `Plus Jakarta Sans`), and Canvas Confetti.
 
 ---
@@ -53,7 +53,7 @@ A modern, high-performance personal goal and habit management application built 
    ```
 
 2. **Configure Database:**
-   Ensure MySQL is running on `127.0.0.1:3306`. By default, `db.php` connects with:
+   Ensure MySQL is running on `127.0.0.1:3306`. By default, `classes/Database.php` connects with:
    - Host: `127.0.0.1`
    - Port: `3306`
    - User: `root`
@@ -79,17 +79,25 @@ A modern, high-performance personal goal and habit management application built 
 
 ```
 Goal_tracker/
-├── api.php          # RESTful JSON API endpoints
-├── common.js        # Shared helpers (API fetch, theme, fullscreen, confetti)
-├── dashboard.php    # Main dashboard with roadmap cards & habit sprints
-├── db.php           # PDO connection & automated schema migrations
-├── english.php      # 100-Day English fluency roadmap
-├── german.php       # 50-Day A1 German roadmap
-├── health.php       # 100-Day Health & vitality roadmap
-├── index.php        # Entry point redirecting to dashboard.php
-├── navbar.php       # Reusable top navigation bar
-├── router.php       # Local PHP dev server router
-└── style.css        # Complete styling & design system
+├── api.php                  # RESTful API entry point (dispatches ApiController)
+├── classes/                 # OOP PHP Architecture
+│   ├── ApiController.php        # Request router & validation controller
+│   ├── ApiResponse.php          # Standardized JSON response handler
+│   ├── ChallengeRepository.php  # Data access layer for habit sprint challenges
+│   ├── DailyTaskRepository.php  # Data access layer for today's custom tasks
+│   ├── Database.php             # Singleton PDO connection manager & schema migration
+│   └── TrackerRepository.php    # Data access layer for trackers, days, goals, rewards
+├── common.js                # Shared helpers (API fetch, theme, fullscreen, confetti)
+├── dashboard.php            # Main dashboard with roadmap cards & habit sprints
+├── db.php                   # Database bootstrap, autoloader & legacy wrappers
+├── english.php              # 100-Day English fluency roadmap
+├── german.php               # 50-Day A1 German roadmap
+├── health.php               # 100-Day Health & vitality roadmap
+├── index.php                # Entry point redirecting to dashboard.php
+├── navbar.php               # Reusable top navigation bar
+├── router.php               # Local PHP dev server router
+├── style.css                # Complete styling & design system
+└── today.php                # Today's Command Center with Edit Mode
 ```
 
 ---
