@@ -6,14 +6,53 @@ import GermanRoadmap from './components/GermanRoadmap';
 import EnglishRoadmap from './components/EnglishRoadmap';
 import HealthRoadmap from './components/HealthRoadmap';
 import GoalRoadmap from './components/GoalRoadmap';
-import { showToast } from './api';
+import AuthPage from './components/AuthPage';
+import { getStoredUser, fetchCurrentUser, authLogout, showToast } from './api';
 
 export default function App() {
+  const [user, setUser] = useState(() => getStoredUser());
+  const [authChecking, setAuthChecking] = useState(true);
   const [activePage, setActivePage] = useState('dashboard');
   const [theme, setTheme] = useState(() => {
     return localStorage.getItem('goal_tracker_theme') || 'dark';
   });
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Check current session on mount
+  useEffect(() => {
+    async function checkSession() {
+      try {
+        const currentUser = await fetchCurrentUser();
+        if (currentUser) {
+          setUser(currentUser);
+        } else {
+          setUser(null);
+        }
+      } catch (err) {
+        console.warn('Session check failed:', err);
+      } finally {
+        setAuthChecking(false);
+      }
+    }
+    checkSession();
+
+    // Listen to unauthorized or logout events
+    const handleUnauthorized = () => {
+      setUser(null);
+      showToast('Session expired. Please sign in again.');
+    };
+    const handleLoggedOut = () => {
+      setUser(null);
+    };
+
+    window.addEventListener('gt-unauthorized', handleUnauthorized);
+    window.addEventListener('gt-logged-out', handleLoggedOut);
+
+    return () => {
+      window.removeEventListener('gt-unauthorized', handleUnauthorized);
+      window.removeEventListener('gt-logged-out', handleLoggedOut);
+    };
+  }, []);
 
   // Apply theme to document element
   useEffect(() => {
@@ -56,6 +95,46 @@ export default function App() {
     return () => document.removeEventListener('fullscreenchange', handleFsChange);
   }, []);
 
+  const handleLogout = async () => {
+    await authLogout();
+    setUser(null);
+    setActivePage('dashboard');
+    showToast('Signed out successfully 👋');
+  };
+
+  // If session is verifying
+  if (authChecking) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'column',
+        gap: '16px',
+        color: 'var(--text-muted)'
+      }}>
+        <div style={{ fontSize: '2.5rem' }}>🎯</div>
+        <div style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--text-main)' }}>
+          Loading GoalTracker Pro...
+        </div>
+      </div>
+    );
+  }
+
+  // If not authenticated, show Email + 4-digit PIN Auth Screen
+  if (!user) {
+    return (
+      <div className="app-wrapper">
+        <AuthPage onLoginSuccess={(u) => {
+          setUser(u);
+          setActivePage('dashboard');
+        }} />
+      </div>
+    );
+  }
+
+  // Authenticated SaaS Dashboard
   return (
     <div className="app-wrapper">
       <Navbar
@@ -65,6 +144,8 @@ export default function App() {
         toggleTheme={toggleTheme}
         isFullscreen={isFullscreen}
         toggleFullscreen={toggleFullscreen}
+        user={user}
+        onLogout={handleLogout}
       />
 
       <main style={{ marginTop: '20px' }}>

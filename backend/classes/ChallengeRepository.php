@@ -5,6 +5,7 @@ declare(strict_types=1);
  * ChallengeRepository
  * 
  * Object-oriented Data Access Layer for Habit Sprint Challenges.
+ * Fully multi-tenant with strict user scoping.
  */
 class ChallengeRepository
 {
@@ -16,14 +17,15 @@ class ChallengeRepository
     }
 
     /**
-     * Get all challenges ordered by creation date descending.
+     * Get all challenges for a user ordered by creation date descending.
      */
-    public function getAll(): array
+    public function getAll(int $userId = 1): array
     {
         $sql = "SELECT id, title, days, start_date, status, created_at, reward, completion_note, reward_redeemed, redeemed_at, end_time, archived_at 
                 FROM challenges 
+                WHERE user_id = :uid
                 ORDER BY created_at DESC";
-        $rows = $this->db->fetchAll($sql);
+        $rows = $this->db->fetchAll($sql, [':uid' => $userId]);
         $challenges = [];
 
         foreach ($rows as $crow) {
@@ -47,26 +49,33 @@ class ChallengeRepository
     }
 
     /**
-     * Get count of currently active challenges.
+     * Get count of currently active challenges for a user.
      */
-    public function getActiveCount(): int
+    public function getActiveCount(int $userId = 1): int
     {
-        return (int)$this->db->fetchColumn("SELECT COUNT(*) FROM challenges WHERE status = 'active'");
+        return (int)$this->db->fetchColumn(
+            "SELECT COUNT(*) FROM challenges WHERE user_id = :uid AND status = 'active'",
+            [':uid' => $userId]
+        );
     }
 
     /**
-     * Check if a challenge exists by id.
+     * Check if a challenge exists by id for a user.
      */
-    public function exists(string $id): bool
+    public function exists(int $userId, string $id): bool
     {
-        $res = $this->db->fetchOne("SELECT id FROM challenges WHERE id = :id", [':id' => $id]);
+        $res = $this->db->fetchOne(
+            "SELECT id FROM challenges WHERE user_id = :uid AND id = :id", 
+            [':uid' => $userId, ':id' => $id]
+        );
         return $res !== null;
     }
 
     /**
-     * Save or update a habit challenge.
+     * Save or update a habit challenge for a user.
      */
     public function save(
+        int $userId,
         string $id,
         string $title,
         int $days,
@@ -76,8 +85,8 @@ class ChallengeRepository
         string $note = '',
         bool $rewardRedeemed = false
     ): bool {
-        $sql = "INSERT INTO challenges (id, title, days, start_date, status, reward, completion_note, reward_redeemed, created_at, end_time)
-                VALUES (:id, :title, :days, :sdate, :status, :reward, :note, :redeemed, NOW(), DATE_ADD(NOW(), INTERVAL :days DAY))
+        $sql = "INSERT INTO challenges (id, user_id, title, days, start_date, status, reward, completion_note, reward_redeemed, created_at, end_time)
+                VALUES (:id, :uid, :title, :days, :sdate, :status, :reward, :note, :redeemed, NOW(), DATE_ADD(NOW(), INTERVAL :days DAY))
                 ON DUPLICATE KEY UPDATE
                     title = VALUES(title),
                     days = VALUES(days),
@@ -90,6 +99,7 @@ class ChallengeRepository
 
         return $this->db->execute($sql, [
             ':id' => $id,
+            ':uid' => $userId,
             ':title' => $title,
             ':days' => $days,
             ':sdate' => $startDate,
@@ -103,16 +113,17 @@ class ChallengeRepository
     /**
      * Redeem challenge reward with note.
      */
-    public function redeem(string $id, string $completionNote): bool
+    public function redeem(int $userId, string $id, string $completionNote): bool
     {
         $sql = "UPDATE challenges 
                 SET reward_redeemed = 1, 
                     redeemed_at = NOW(), 
                     completion_note = :note, 
                     status = 'completed'
-                WHERE id = :id";
+                WHERE user_id = :uid AND id = :id";
 
         return $this->db->execute($sql, [
+            ':uid' => $userId,
             ':id' => $id,
             ':note' => $completionNote
         ]);
@@ -121,26 +132,26 @@ class ChallengeRepository
     /**
      * Archive an expired or finished challenge.
      */
-    public function archive(string $id): bool
+    public function archive(int $userId, string $id): bool
     {
-        $sql = "UPDATE challenges SET status = 'archived', archived_at = NOW() WHERE id = :id";
-        return $this->db->execute($sql, [':id' => $id]);
+        $sql = "UPDATE challenges SET status = 'archived', archived_at = NOW() WHERE user_id = :uid AND id = :id";
+        return $this->db->execute($sql, [':uid' => $userId, ':id' => $id]);
     }
 
     /**
      * Unarchive a challenge back to active.
      */
-    public function unarchive(string $id): bool
+    public function unarchive(int $userId, string $id): bool
     {
-        $sql = "UPDATE challenges SET status = 'active', archived_at = NULL WHERE id = :id";
-        return $this->db->execute($sql, [':id' => $id]);
+        $sql = "UPDATE challenges SET status = 'active', archived_at = NULL WHERE user_id = :uid AND id = :id";
+        return $this->db->execute($sql, [':uid' => $userId, ':id' => $id]);
     }
 
     /**
      * Delete a challenge completely.
      */
-    public function delete(string $id): bool
+    public function delete(int $userId, string $id): bool
     {
-        return $this->db->execute("DELETE FROM challenges WHERE id = :id", [':id' => $id]);
+        return $this->db->execute("DELETE FROM challenges WHERE user_id = :uid AND id = :id", [':uid' => $userId, ':id' => $id]);
     }
 }

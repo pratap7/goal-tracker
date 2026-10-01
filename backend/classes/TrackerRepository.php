@@ -5,6 +5,7 @@ declare(strict_types=1);
  * TrackerRepository
  * 
  * Object-oriented Data Access Layer for trackers, daily lessons, goals, and rewards.
+ * Fully multi-tenant with strict user scoping.
  */
 class TrackerRepository
 {
@@ -16,11 +17,15 @@ class TrackerRepository
     }
 
     /**
-     * Get metadata for all active trackers.
+     * Get metadata for all active trackers for a user.
      */
-    public function getTrackersMeta(): array
+    public function getTrackersMeta(int $userId = 1): array
     {
-        $rows = $this->db->fetchAll("SELECT id, title, total_days, start_date, emoji, subtitle, theme, status FROM trackers WHERE status != 'archived' ORDER BY created_at ASC");
+        $sql = "SELECT id, title, total_days, start_date, emoji, subtitle, theme, status 
+                FROM trackers 
+                WHERE user_id = :uid AND status != 'archived' 
+                ORDER BY created_at ASC";
+        $rows = $this->db->fetchAll($sql, [':uid' => $userId]);
         $trackers = [];
         foreach ($rows as $tr) {
             $trackers[$tr['id']] = [
@@ -38,9 +43,10 @@ class TrackerRepository
     }
 
     /**
-     * Save or update tracker metadata.
+     * Save or update tracker metadata for a user.
      */
     public function saveTrackerMeta(
+        int $userId,
         string $id,
         string $title,
         int $totalDays,
@@ -49,8 +55,8 @@ class TrackerRepository
         string $subtitle = '',
         string $theme = 'theme-german'
     ): bool {
-        $sql = "INSERT INTO trackers (id, title, total_days, start_date, emoji, subtitle, theme, status, updated_at)
-                VALUES (:id, :title, :total, :sdate, :emoji, :sub, :theme, 'active', NOW())
+        $sql = "INSERT INTO trackers (id, user_id, title, total_days, start_date, emoji, subtitle, theme, status, updated_at)
+                VALUES (:id, :uid, :title, :total, :sdate, :emoji, :sub, :theme, 'active', NOW())
                 ON DUPLICATE KEY UPDATE 
                     title = IF(VALUES(title) != '', VALUES(title), title),
                     total_days = IF(VALUES(total_days) > 0, VALUES(total_days), total_days),
@@ -63,6 +69,7 @@ class TrackerRepository
 
         return $this->db->execute($sql, [
             ':id' => $id,
+            ':uid' => $userId,
             ':title' => $title,
             ':total' => $totalDays,
             ':sdate' => $startDate,
@@ -73,31 +80,33 @@ class TrackerRepository
     }
 
     /**
-     * Delete a goal tracker permanently.
+     * Delete a goal tracker permanently for a user.
      */
-    public function deleteTracker(string $id): bool
+    public function deleteTracker(int $userId, string $id): bool
     {
-        $this->db->execute("DELETE FROM trackers WHERE id = :id", [':id' => $id]);
-        $this->db->execute("DELETE FROM tracker_days WHERE tracker_id = :id", [':id' => $id]);
-        $this->db->execute("DELETE FROM tracker_goals WHERE tracker_id = :id", [':id' => $id]);
-        $this->db->execute("DELETE FROM tracker_rewards WHERE tracker_id = :id", [':id' => $id]);
+        $this->db->execute("DELETE FROM trackers WHERE user_id = :uid AND id = :id", [':uid' => $userId, ':id' => $id]);
+        $this->db->execute("DELETE FROM tracker_days WHERE user_id = :uid AND tracker_id = :id", [':uid' => $userId, ':id' => $id]);
+        $this->db->execute("DELETE FROM tracker_goals WHERE user_id = :uid AND tracker_id = :id", [':uid' => $userId, ':id' => $id]);
+        $this->db->execute("DELETE FROM tracker_rewards WHERE user_id = :uid AND tracker_id = :id", [':uid' => $userId, ':id' => $id]);
         return true;
     }
 
     /**
-     * Fetch all day progress records for all trackers.
+     * Fetch all day progress records for all trackers of a user.
      */
-    public function getAllDays(): array
+    public function getAllDays(int $userId = 1): array
     {
         $sql = "SELECT tracker_id, day_number, tasks, note, metrics, done_tasks, total_tasks, is_completed, log_date, custom_title 
                 FROM tracker_days 
+                WHERE user_id = :uid
                 ORDER BY tracker_id, day_number ASC";
-        $rows = $this->db->fetchAll($sql);
+        $rows = $this->db->fetchAll($sql, [':uid' => $userId]);
         $days = [];
 
         foreach ($rows as $row) {
             $tid = $row['tracker_id'];
             $dnum = (int)$row['day_number'];
+
             if (!isset($days[$tid])) {
                 $days[$tid] = [];
             }
@@ -122,14 +131,14 @@ class TrackerRepository
     }
 
     /**
-     * Fetch single day record.
+     * Fetch single day record for a user.
      */
-    public function getDay(string $trackerId, int $day): ?array
+    public function getDay(int $userId, string $trackerId, int $day): ?array
     {
         $sql = "SELECT tracker_id, day_number, tasks, note, metrics, done_tasks, total_tasks, is_completed, log_date, custom_title 
                 FROM tracker_days 
-                WHERE tracker_id = :tid AND day_number = :day";
-        $row = $this->db->fetchOne($sql, [':tid' => $trackerId, ':day' => $day]);
+                WHERE user_id = :uid AND tracker_id = :tid AND day_number = :day";
+        $row = $this->db->fetchOne($sql, [':uid' => $userId, ':tid' => $trackerId, ':day' => $day]);
         if (!$row) return null;
 
         $tasks = !empty($row['tasks']) ? json_decode($row['tasks'], true) : [];
@@ -152,6 +161,7 @@ class TrackerRepository
      * Save progress for a specific day.
      */
     public function saveDay(
+        int $userId,
         string $trackerId,
         int $day,
         array $tasks,
@@ -168,8 +178,8 @@ class TrackerRepository
         $logDateStr = $logDate ?: date('Y-m-d');
 
         $sql = "INSERT INTO tracker_days 
-                (tracker_id, day_number, tasks, note, metrics, done_tasks, total_tasks, is_completed, log_date, custom_title, updated_at)
-                VALUES (:tid, :day, :tasks, :note, :metrics, :done, :total, :completed, :logdate, :ctitle, NOW())
+                (user_id, tracker_id, day_number, tasks, note, metrics, done_tasks, total_tasks, is_completed, log_date, custom_title, updated_at)
+                VALUES (:uid, :tid, :day, :tasks, :note, :metrics, :done, :total, :completed, :logdate, :ctitle, NOW())
                 ON DUPLICATE KEY UPDATE 
                     tasks = VALUES(tasks),
                     note = VALUES(note),
@@ -182,6 +192,7 @@ class TrackerRepository
                     updated_at = NOW()";
 
         return $this->db->execute($sql, [
+            ':uid' => $userId,
             ':tid' => $trackerId,
             ':day' => $day,
             ':tasks' => $tasksJson,
@@ -196,15 +207,16 @@ class TrackerRepository
     }
 
     /**
-     * Update custom day title directly.
+     * Update custom day title directly for a user.
      */
-    public function saveDayTitle(string $trackerId, int $day, string $title): bool
+    public function saveDayTitle(int $userId, string $trackerId, int $day, string $title): bool
     {
-        $sql = "INSERT INTO tracker_days (tracker_id, day_number, custom_title, updated_at)
-                VALUES (:tid, :day, :title, NOW())
+        $sql = "INSERT INTO tracker_days (user_id, tracker_id, day_number, custom_title, updated_at)
+                VALUES (:uid, :tid, :day, :title, NOW())
                 ON DUPLICATE KEY UPDATE custom_title = VALUES(custom_title), updated_at = NOW()";
 
         return $this->db->execute($sql, [
+            ':uid' => $userId,
             ':tid' => $trackerId,
             ':day' => $day,
             ':title' => $title
@@ -212,17 +224,17 @@ class TrackerRepository
     }
 
     /**
-     * Update day tasks directly.
+     * Update day tasks directly for a user.
      */
-    public function saveDayTasks(string $trackerId, int $day, array $tasks): bool
+    public function saveDayTasks(int $userId, string $trackerId, int $day, array $tasks): bool
     {
         $tasksJson = json_encode($tasks, JSON_UNESCAPED_UNICODE);
         $doneTasks = count(array_filter($tasks, fn($t) => !empty($t['done'])));
         $totalTasks = count($tasks);
         $isCompleted = ($totalTasks > 0 && $doneTasks === $totalTasks) ? 1 : 0;
 
-        $sql = "INSERT INTO tracker_days (tracker_id, day_number, tasks, done_tasks, total_tasks, is_completed, updated_at)
-                VALUES (:tid, :day, :tasks, :done, :total, :completed, NOW())
+        $sql = "INSERT INTO tracker_days (user_id, tracker_id, day_number, tasks, done_tasks, total_tasks, is_completed, updated_at)
+                VALUES (:uid, :tid, :day, :tasks, :done, :total, :completed, NOW())
                 ON DUPLICATE KEY UPDATE 
                     tasks = VALUES(tasks),
                     done_tasks = VALUES(done_tasks),
@@ -231,6 +243,7 @@ class TrackerRepository
                     updated_at = NOW()";
 
         return $this->db->execute($sql, [
+            ':uid' => $userId,
             ':tid' => $trackerId,
             ':day' => $day,
             ':tasks' => $tasksJson,
@@ -241,15 +254,15 @@ class TrackerRepository
     }
 
     /**
-     * Batch save days for a tracker inside a transaction.
+     * Batch save days for a tracker inside a transaction for a user.
      */
-    public function batchSaveDays(string $trackerId, array $daysData): int
+    public function batchSaveDays(int $userId, string $trackerId, array $daysData): int
     {
         $this->db->beginTransaction();
         try {
             $sql = "INSERT INTO tracker_days 
-                    (tracker_id, day_number, tasks, note, metrics, done_tasks, total_tasks, is_completed, log_date, updated_at)
-                    VALUES (:tid, :day, :tasks, :note, :metrics, :done, :total, :completed, :logdate, NOW())
+                    (user_id, tracker_id, day_number, tasks, note, metrics, done_tasks, total_tasks, is_completed, log_date, updated_at)
+                    VALUES (:uid, :tid, :day, :tasks, :note, :metrics, :done, :total, :completed, :logdate, NOW())
                     ON DUPLICATE KEY UPDATE 
                         tasks = VALUES(tasks),
                         note = VALUES(note),
@@ -277,6 +290,7 @@ class TrackerRepository
                 $logDate = !empty($d['logDate']) ? $d['logDate'] : date('Y-m-d');
 
                 $stmt->execute([
+                    ':uid' => $userId,
                     ':tid' => $trackerId,
                     ':day' => $dayNumber,
                     ':tasks' => $tasksJson,
@@ -299,22 +313,22 @@ class TrackerRepository
     }
 
     /**
-     * Reset tracker days, goals, and rewards.
+     * Reset tracker days, goals, and rewards for a user.
      */
-    public function resetTracker(string $trackerId): bool
+    public function resetTracker(int $userId, string $trackerId): bool
     {
-        $this->db->execute("DELETE FROM tracker_days WHERE tracker_id = :tid", [':tid' => $trackerId]);
-        $this->db->execute("DELETE FROM tracker_goals WHERE tracker_id = :tid", [':tid' => $trackerId]);
-        $this->db->execute("DELETE FROM tracker_rewards WHERE tracker_id = :tid", [':tid' => $trackerId]);
+        $this->db->execute("DELETE FROM tracker_days WHERE user_id = :uid AND tracker_id = :tid", [':uid' => $userId, ':tid' => $trackerId]);
+        $this->db->execute("DELETE FROM tracker_goals WHERE user_id = :uid AND tracker_id = :tid", [':uid' => $userId, ':tid' => $trackerId]);
+        $this->db->execute("DELETE FROM tracker_rewards WHERE user_id = :uid AND tracker_id = :tid", [':uid' => $userId, ':tid' => $trackerId]);
         return true;
     }
 
     /**
-     * Goals and rewards.
+     * Goals and rewards scoped by user.
      */
-    public function getGoals(): array
+    public function getGoals(int $userId = 1): array
     {
-        $rows = $this->db->fetchAll("SELECT tracker_id, goals FROM tracker_goals");
+        $rows = $this->db->fetchAll("SELECT tracker_id, goals FROM tracker_goals WHERE user_id = :uid", [':uid' => $userId]);
         $goals = [];
         foreach ($rows as $row) {
             $goals[$row['tracker_id']] = json_decode($row['goals'], true) ?: [];
@@ -322,21 +336,22 @@ class TrackerRepository
         return $goals;
     }
 
-    public function saveGoals(string $trackerId, array $goals): bool
+    public function saveGoals(int $userId, string $trackerId, array $goals): bool
     {
-        $sql = "INSERT INTO tracker_goals (tracker_id, goals, updated_at) 
-                VALUES (:tid, :goals, NOW())
+        $sql = "INSERT INTO tracker_goals (user_id, tracker_id, goals, updated_at) 
+                VALUES (:uid, :tid, :goals, NOW())
                 ON DUPLICATE KEY UPDATE goals = VALUES(goals), updated_at = NOW()";
 
         return $this->db->execute($sql, [
+            ':uid' => $userId,
             ':tid' => $trackerId,
             ':goals' => json_encode($goals, JSON_UNESCAPED_UNICODE)
         ]);
     }
 
-    public function getRewards(): array
+    public function getRewards(int $userId = 1): array
     {
-        $rows = $this->db->fetchAll("SELECT tracker_id, rewards FROM tracker_rewards");
+        $rows = $this->db->fetchAll("SELECT tracker_id, rewards FROM tracker_rewards WHERE user_id = :uid", [':uid' => $userId]);
         $rewards = [];
         foreach ($rows as $row) {
             $rewards[$row['tracker_id']] = json_decode($row['rewards'], true) ?: [];
@@ -344,13 +359,14 @@ class TrackerRepository
         return $rewards;
     }
 
-    public function saveRewards(string $trackerId, array $rewards): bool
+    public function saveRewards(int $userId, string $trackerId, array $rewards): bool
     {
-        $sql = "INSERT INTO tracker_rewards (tracker_id, rewards, updated_at) 
-                VALUES (:tid, :rewards, NOW())
+        $sql = "INSERT INTO tracker_rewards (user_id, tracker_id, rewards, updated_at) 
+                VALUES (:uid, :tid, :rewards, NOW())
                 ON DUPLICATE KEY UPDATE rewards = VALUES(rewards), updated_at = NOW()";
 
         return $this->db->execute($sql, [
+            ':uid' => $userId,
             ':tid' => $trackerId,
             ':rewards' => json_encode($rewards, JSON_UNESCAPED_UNICODE)
         ]);

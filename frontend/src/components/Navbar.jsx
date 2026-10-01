@@ -1,12 +1,18 @@
 import React from 'react';
 
-export default function Navbar({ activePage, setActivePage, theme, toggleTheme, isFullscreen, toggleFullscreen }) {
+export default function Navbar({
+  activePage,
+  setActivePage,
+  theme,
+  toggleTheme,
+  isFullscreen,
+  toggleFullscreen,
+  user,
+  onLogout
+}) {
   const navItems = [
     { id: 'dashboard', label: '📊 Dashboard' },
-    { id: 'today', label: "⚡ Today's Tasks", badge: "Live" },
-    { id: 'german', label: '🇩🇪 German A1' },
-    { id: 'english', label: '📘 English Pro' },
-    { id: 'health', label: '🌿 Health 100' }
+    { id: 'today', label: "⚡ Today's Tasks", badge: "Live" }
   ];
 
   return (
@@ -51,6 +57,28 @@ export default function Navbar({ activePage, setActivePage, theme, toggleTheme, 
           <span className="dot-pulse" />
           <span>MySQL Live</span>
         </div>
+
+        {/* User Session Pill */}
+        {user && (
+          <div className="nav-user-badge" title={`Signed in as ${user.email}`}>
+            <span className="user-avatar-dot" />
+            <span className="user-email-text">{user.email}</span>
+          </div>
+        )}
+
+        {/* Sign Out Button */}
+        {user && onLogout && (
+          <button
+            type="button"
+            className="btn-nav-logout"
+            onClick={onLogout}
+            title="Sign out of your account"
+            aria-label="Sign Out"
+          >
+            <span>🚪</span>
+            <span>Sign Out</span>
+          </button>
+        )}
 
         {/* Fullscreen Button */}
         <button

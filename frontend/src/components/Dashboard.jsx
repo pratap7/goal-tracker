@@ -86,48 +86,10 @@ export default function Dashboard({ setActivePage }) {
   // Tracker configuration & progress dynamically from MySQL
   const trackersConfig = useMemo(() => {
     const trackersMap = data.trackers || {};
-    const defaultList = [
-      {
-        id: 'german',
-        pageId: 'german',
-        emoji: '🇩🇪',
-        title: 'A1 German Mastery',
-        sub: 'Grammar • 1 Book Lesson • Song • Teach-back Video • Speaking AI',
-        totalDays: 50,
-        startDate: todayStr(),
-        theme: 'theme-german',
-        isCustom: false
-      },
-      {
-        id: 'english',
-        pageId: 'english',
-        emoji: '📘',
-        title: 'English Fluency Pro',
-        sub: 'Daily Input • 1 Lesson • 10 New Words • Speaking Practice',
-        totalDays: 100,
-        startDate: todayStr(),
-        theme: 'theme-english',
-        isCustom: false
-      },
-      {
-        id: 'health',
-        pageId: 'health',
-        emoji: '🌿',
-        title: 'Health & Vitality 100',
-        sub: 'Movement • Balanced Eating • Mindfulness • Sleep • Daily Metrics',
-        totalDays: 100,
-        startDate: todayStr(),
-        theme: 'theme-health',
-        isCustom: false
-      }
-    ];
-
-    const seenIds = new Set();
     const trackers = [];
 
     // Prioritize trackers returned from MySQL
     Object.values(trackersMap).forEach(tr => {
-      seenIds.add(tr.id);
       trackers.push({
         id: tr.id,
         pageId: tr.id,
@@ -139,13 +101,6 @@ export default function Dashboard({ setActivePage }) {
         theme: tr.theme || 'theme-german',
         isCustom: !['german', 'english', 'health'].includes(tr.id)
       });
-    });
-
-    // Add default built-ins if not in MySQL yet
-    defaultList.forEach(def => {
-      if (!seenIds.has(def.id)) {
-        trackers.push(def);
-      }
     });
 
     let grandDoneTasks = 0;
@@ -506,6 +461,24 @@ export default function Dashboard({ setActivePage }) {
     }
   };
 
+  const handleAddTemplate = async (templateKey) => {
+    try {
+      const res = await fetchApi('init_template', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ template: templateKey })
+      });
+      if (res && res.success) {
+        showToast(res.message || 'Blueprint added! 🎉');
+        await loadData();
+      } else {
+        showToast(`⚠️ ${res?.error || 'Failed to initialize template'}`);
+      }
+    } catch (e) {
+      showToast('Error adding template');
+    }
+  };
+
   if (loading) {
     return (
       <div style={{ textAlign: 'center', padding: '80px 20px', color: 'var(--text-muted)' }}>
@@ -538,7 +511,7 @@ export default function Dashboard({ setActivePage }) {
           <div className="stat-pill">
             <span className="stat-pill-label">Days Completed</span>
             <span className="stat-pill-value">{trackersConfig.grandDoneDays}</span>
-            <span className="stat-pill-sub">across all 3 active tracks</span>
+            <span className="stat-pill-sub">across active tracks</span>
           </div>
 
           <div className="stat-pill">
@@ -568,67 +541,161 @@ export default function Dashboard({ setActivePage }) {
           + Add New Goal
         </button>
       </div>
+
       <div className="trackers-list">
-        {trackersConfig.list.map(cfg => (
-          <div
-            key={cfg.id}
-            className={`tracker-card ${cfg.theme}`}
-            onClick={() => setActivePage(cfg.pageId)}
-          >
-            <div className="card-header-flex">
-              <div className="card-emoji-wrap">{cfg.emoji}</div>
-              <div className="card-meta-wrap">
-                <div className="card-title-row">
-                  <span className="card-main-title">{cfg.title}</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span className="card-badge">{cfg.totalDays} Days</span>
-                    <span className="locked-badge-pill" title="Goal roadmap is committed & locked">🔒 Locked</span>
-                    <button
-                      type="button"
-                      className="btn-card-edit"
-                      title="View / Customize goal settings"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOpenEditGoal(cfg);
-                      }}
-                    >
-                      ✏️ Edit
-                    </button>
-                  </div>
-                </div>
-                <div className="card-sub">{cfg.sub}</div>
-              </div>
+        {trackersConfig.list.length === 0 ? (
+          <div className="empty-dashboard-card">
+            <div className="empty-dashboard-icon">🎯</div>
+            <h3 className="empty-dashboard-title">Your Goal Roadmap is Ready</h3>
+            <p className="empty-dashboard-sub">
+              You don't have any active goals yet. Create a custom goal roadmap with your own milestones, days, and habits, or jumpstart with a proven blueprint below.
+            </p>
+            <div style={{ marginBottom: '24px' }}>
+              <button
+                type="button"
+                className="btn btn-primary"
+                style={{
+                  padding: '12px 28px',
+                  fontSize: '0.95rem',
+                  fontWeight: 700,
+                  borderRadius: 'var(--radius-full)',
+                  cursor: 'pointer'
+                }}
+                onClick={() => {
+                  setNewGoalTitle("");
+                  setNewGoalSubtitle("");
+                  setNewGoalEmoji("🎯");
+                  setNewGoalDays(30);
+                  setNewGoalStartDate(todayStr());
+                  setNewGoalTheme("theme-german");
+                  setShowAddGoalModal(true);
+                }}
+              >
+                ✨ + Create Your First Custom Goal
+              </button>
             </div>
 
-            <div className="progress-bar-wrap">
-              <div className="progress-bar-bg">
-                <div
-                  className={`progress-bar-fill ${cfg.theme}`}
-                  style={{ width: `${cfg.pct}%` }}
-                />
-              </div>
-              <div className="card-stats-row">
-                <span>{cfg.doneTasks} / {cfg.totalTasks} tasks done • Open Dedicated Page →</span>
-                <span className="pct-num">{cfg.pct}% • Day {cfg.doneDays} of {cfg.totalDays}</span>
-              </div>
-              <div className="card-stats-row" style={{ marginTop: '8px', paddingTop: '6px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                {(() => {
-                  const t = getCountdownTiming(cfg.startDate, cfg.totalDays, now);
-                  return (
-                    <>
-                      <span style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                        ⏱️ <strong style={{ color: 'var(--text-main)', fontFamily: 'monospace' }}>{t.isExpired ? 'Goal Completed' : t.formatted}</strong>
-                      </span>
-                      <span style={{ fontSize: '0.74rem', color: 'var(--text-dim)' }}>
-                        Target: {formatDate(cfg.startDate, Math.max(0, cfg.totalDays - 1))}
-                      </span>
-                    </>
-                  );
-                })()}
+            <div className="starter-templates-wrap">
+              <div className="starter-templates-label">⚡ OR QUICK START WITH A PROVEN BLUEPRINT</div>
+              <div className="starter-templates-grid">
+                <div className="template-card">
+                  <div className="template-header">
+                    <span className="template-emoji">🇩🇪</span>
+                    <div>
+                      <div className="template-title">A1 German Mastery</div>
+                      <div className="template-days">50 Days Roadmap</div>
+                    </div>
+                  </div>
+                  <p className="template-desc">Grammar, daily lessons, song immersion, teach-back videos & speaking AI practice.</p>
+                  <button
+                    type="button"
+                    className="btn-template-add"
+                    onClick={() => handleAddTemplate('german')}
+                  >
+                    + Add German Roadmap
+                  </button>
+                </div>
+
+                <div className="template-card">
+                  <div className="template-header">
+                    <span className="template-emoji">📘</span>
+                    <div>
+                      <div className="template-title">English Fluency Pro</div>
+                      <div className="template-days">100 Days Roadmap</div>
+                    </div>
+                  </div>
+                  <p className="template-desc">Daily input, 10 new vocabulary words, speaking recordings & AI fluency conversations.</p>
+                  <button
+                    type="button"
+                    className="btn-template-add"
+                    onClick={() => handleAddTemplate('english')}
+                  >
+                    + Add English Roadmap
+                  </button>
+                </div>
+
+                <div className="template-card">
+                  <div className="template-header">
+                    <span className="template-emoji">🌿</span>
+                    <div>
+                      <div className="template-title">Health & Vitality 100</div>
+                      <div className="template-days">100 Days Roadmap</div>
+                    </div>
+                  </div>
+                  <p className="template-desc">Movement, whole foods, hydration, meditation, daily metrics & restorative sleep.</p>
+                  <button
+                    type="button"
+                    className="btn-template-add"
+                    onClick={() => handleAddTemplate('health')}
+                  >
+                    + Add Health Roadmap
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        ))}
+        ) : (
+          trackersConfig.list.map(cfg => (
+            <div
+              key={cfg.id}
+              className={`tracker-card ${cfg.theme}`}
+              onClick={() => setActivePage(cfg.pageId)}
+            >
+              <div className="card-header-flex">
+                <div className="card-emoji-wrap">{cfg.emoji}</div>
+                <div className="card-meta-wrap">
+                  <div className="card-title-row">
+                    <span className="card-main-title">{cfg.title}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span className="card-badge">{cfg.totalDays} Days</span>
+                      <span className="locked-badge-pill" title="Goal roadmap is committed & locked">🔒 Locked</span>
+                      <button
+                        type="button"
+                        className="btn-card-edit"
+                        title="View / Customize goal settings"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenEditGoal(cfg);
+                        }}
+                      >
+                        ✏️ Edit
+                      </button>
+                    </div>
+                  </div>
+                  <div className="card-sub">{cfg.sub}</div>
+                </div>
+              </div>
+
+              <div className="progress-bar-wrap">
+                <div className="progress-bar-bg">
+                  <div
+                    className={`progress-bar-fill ${cfg.theme}`}
+                    style={{ width: `${cfg.pct}%` }}
+                  />
+                </div>
+                <div className="card-stats-row">
+                  <span>{cfg.doneTasks} / {cfg.totalTasks} tasks done • Open Dedicated Page →</span>
+                  <span className="pct-num">{cfg.pct}% • Day {cfg.doneDays} of {cfg.totalDays}</span>
+                </div>
+                <div className="card-stats-row" style={{ marginTop: '8px', paddingTop: '6px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                  {(() => {
+                    const t = getCountdownTiming(cfg.startDate, cfg.totalDays, now);
+                    return (
+                      <>
+                        <span style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          ⏱️ <strong style={{ color: 'var(--text-main)', fontFamily: 'monospace' }}>{t.isExpired ? 'Goal Completed' : t.formatted}</strong>
+                        </span>
+                        <span style={{ fontSize: '0.74rem', color: 'var(--text-dim)' }}>
+                          Target: {formatDate(cfg.startDate, Math.max(0, cfg.totalDays - 1))}
+                        </span>
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+            </div>
+          ))
+        )}
       </div>
 
       {/* Challenges & Habit Sprints Section */}
@@ -647,7 +714,13 @@ export default function Dashboard({ setActivePage }) {
         </div>
 
         {/* Active Challenge Cards Grid */}
-        {activeChallenges.length > 0 && (
+        {activeChallenges.length === 0 ? (
+          <div className="empty-sprints-card">
+            <div className="empty-sprints-icon">⚡</div>
+            <h4>No Active Habit Sprints Yet</h4>
+            <p>Kickstart your momentum with a 7 to 21-day sprint. Choose a preset idea below or enter your own custom habit challenge!</p>
+          </div>
+        ) : (
           <div className="challenge-cards-grid">
             {activeChallenges.map(ch => {
               const timing = getChallengeTiming(ch, now);

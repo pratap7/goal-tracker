@@ -1,24 +1,115 @@
-// api.js - API client and utility helpers
+// api.js - API client, Authentication, and utility helpers for SaaS GoalTracker
 
 import confetti from 'canvas-confetti';
 
 const API_BASE = '/api.php';
+const TOKEN_KEY = 'gt_auth_token';
+const USER_KEY = 'gt_auth_user';
 
 /**
- * Fetch from backend REST API
+ * Session storage management
+ */
+export function getStoredToken() {
+  return localStorage.getItem(TOKEN_KEY) || '';
+}
+
+export function getStoredUser() {
+  try {
+    const raw = localStorage.getItem(USER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+export function setStoredSession(token, user) {
+  if (token) localStorage.setItem(TOKEN_KEY, token);
+  if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
+}
+
+export function clearStoredSession() {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+}
+
+/**
+ * Fetch from backend REST API with automatic Bearer token injection
  */
 export async function fetchApi(action, options = {}) {
   const url = `${API_BASE}?action=${encodeURIComponent(action)}`;
+  const token = getStoredToken();
+
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(options.headers || {})
+  };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   try {
-    const res = await fetch(url, options);
-    if (!res.ok) {
-      console.warn(`API returned HTTP ${res.status} for ${action}`);
+    const res = await fetch(url, {
+      ...options,
+      headers
+    });
+
+    if (res.status === 401) {
+      console.warn(`Auth required for action "${action}"`);
+      // If 401 on data fetch, clear session and dispatch custom event
+      if (!['login', 'signup', 'status'].includes(action)) {
+        window.dispatchEvent(new CustomEvent('gt-unauthorized'));
+      }
     }
-    return await res.json();
+
+    const data = await res.json();
+    return data;
   } catch (err) {
     console.error(`API fetch error for action "${action}":`, err);
     return { success: false, error: err.message };
   }
+}
+
+/**
+ * Auth API helpers
+ */
+export async function authSignup(email, pin) {
+  const res = await fetchApi('signup', {
+    method: 'POST',
+    body: JSON.stringify({ email, pin })
+  });
+  if (res && res.success && res.token && res.user) {
+    setStoredSession(res.token, res.user);
+  }
+  return res;
+}
+
+export async function authLogin(email, pin) {
+  const res = await fetchApi('login', {
+    method: 'POST',
+    body: JSON.stringify({ email, pin })
+  });
+  if (res && res.success && res.token && res.user) {
+    setStoredSession(res.token, res.user);
+  }
+  return res;
+}
+
+export async function authLogout() {
+  try {
+    await fetchApi('logout', { method: 'POST' });
+  } catch (e) {}
+  clearStoredSession();
+  window.dispatchEvent(new CustomEvent('gt-logged-out'));
+}
+
+export async function fetchCurrentUser() {
+  const res = await fetchApi('me');
+  if (res && res.success && res.user) {
+    setStoredSession(getStoredToken(), res.user);
+    return res.user;
+  }
+  return null;
 }
 
 /**

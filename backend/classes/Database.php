@@ -211,9 +211,85 @@ class Database
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             INDEX idx_task_date (task_date)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        CREATE TABLE IF NOT EXISTS users (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            email VARCHAR(191) NOT NULL UNIQUE,
+            pin_hash VARCHAR(255) NOT NULL,
+            auth_token VARCHAR(64) NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_auth_token (auth_token)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         ";
 
         $this->pdo->exec($schema);
+
+        // Seed initial default demo user (demo@goaltracker.com / PIN 1234) if users table is fresh
+        try {
+            $userCount = (int)$this->pdo->query("SELECT COUNT(*) FROM users")->fetchColumn();
+            if ($userCount === 0) {
+                $demoPinHash = password_hash('1234', PASSWORD_BCRYPT);
+                $demoToken = bin2hex(random_bytes(32));
+                $stmt = $this->pdo->prepare("INSERT INTO users (id, email, pin_hash, auth_token, created_at, updated_at) VALUES (1, 'demo@goaltracker.com', :hash, :token, NOW(), NOW())");
+                $stmt->execute([':hash' => $demoPinHash, ':token' => $demoToken]);
+            }
+        } catch (Exception $e) {
+            // Ignore seeding error if any
+        }
+
+        // Multi-tenant migration: Add user_id column to trackers
+        $checkTrUser = $this->pdo->query("SHOW COLUMNS FROM trackers LIKE 'user_id'")->fetch();
+        if (!$checkTrUser) {
+            $this->pdo->exec("ALTER TABLE trackers ADD COLUMN user_id INT NULL AFTER id, ADD INDEX idx_user_tracker (user_id)");
+            $this->pdo->exec("UPDATE trackers SET user_id = 1 WHERE user_id IS NULL");
+            try {
+                $this->pdo->exec("ALTER TABLE trackers DROP PRIMARY KEY, ADD PRIMARY KEY (user_id, id)");
+            } catch (Exception $e) {}
+        }
+
+        // Multi-tenant migration: Add user_id column to tracker_days
+        $checkDaysUser = $this->pdo->query("SHOW COLUMNS FROM tracker_days LIKE 'user_id'")->fetch();
+        if (!$checkDaysUser) {
+            $this->pdo->exec("ALTER TABLE tracker_days ADD COLUMN user_id INT NULL AFTER id, ADD INDEX idx_user_days (user_id)");
+            $this->pdo->exec("UPDATE tracker_days SET user_id = 1 WHERE user_id IS NULL");
+            try {
+                $this->pdo->exec("ALTER TABLE tracker_days DROP INDEX uk_tracker_day, ADD UNIQUE KEY uk_user_tracker_day (user_id, tracker_id, day_number)");
+            } catch (Exception $e) {}
+        }
+
+        // Multi-tenant migration: Add user_id column to tracker_goals
+        $checkGoalsUser = $this->pdo->query("SHOW COLUMNS FROM tracker_goals LIKE 'user_id'")->fetch();
+        if (!$checkGoalsUser) {
+            $this->pdo->exec("ALTER TABLE tracker_goals ADD COLUMN user_id INT NULL AFTER tracker_id");
+            $this->pdo->exec("UPDATE tracker_goals SET user_id = 1 WHERE user_id IS NULL");
+            try {
+                $this->pdo->exec("ALTER TABLE tracker_goals DROP PRIMARY KEY, ADD PRIMARY KEY (user_id, tracker_id)");
+            } catch (Exception $e) {}
+        }
+
+        // Multi-tenant migration: Add user_id column to tracker_rewards
+        $checkRewardsUser = $this->pdo->query("SHOW COLUMNS FROM tracker_rewards LIKE 'user_id'")->fetch();
+        if (!$checkRewardsUser) {
+            $this->pdo->exec("ALTER TABLE tracker_rewards ADD COLUMN user_id INT NULL AFTER tracker_id");
+            $this->pdo->exec("UPDATE tracker_rewards SET user_id = 1 WHERE user_id IS NULL");
+            try {
+                $this->pdo->exec("ALTER TABLE tracker_rewards DROP PRIMARY KEY, ADD PRIMARY KEY (user_id, tracker_id)");
+            } catch (Exception $e) {}
+        }
+
+        // Multi-tenant migration: Add user_id column to challenges
+        $checkChUser = $this->pdo->query("SHOW COLUMNS FROM challenges LIKE 'user_id'")->fetch();
+        if (!$checkChUser) {
+            $this->pdo->exec("ALTER TABLE challenges ADD COLUMN user_id INT NULL AFTER id, ADD INDEX idx_user_challenge (user_id)");
+            $this->pdo->exec("UPDATE challenges SET user_id = 1 WHERE user_id IS NULL");
+        }
+
+        // Multi-tenant migration: Add user_id column to daily_tasks
+        $checkDtUser = $this->pdo->query("SHOW COLUMNS FROM daily_tasks LIKE 'user_id'")->fetch();
+        if (!$checkDtUser) {
+            $this->pdo->exec("ALTER TABLE daily_tasks ADD COLUMN user_id INT NULL AFTER id, ADD INDEX idx_user_task (user_id)");
+            $this->pdo->exec("UPDATE daily_tasks SET user_id = 1 WHERE user_id IS NULL");
+        }
 
         // Incremental column migrations for challenges table
         $cols = [
@@ -250,16 +326,6 @@ class Database
                 $this->pdo->exec("ALTER TABLE trackers ADD COLUMN {$col} {$type}");
             }
         }
-
-        // Populate default tracker metadata for built-in goals
-        $this->pdo->exec("
-            UPDATE trackers SET emoji = '🇩🇪', subtitle = 'Grammar • 1 Book Lesson • Song • Teach-back Video • Speaking AI', theme = 'theme-german' 
-            WHERE id = 'german' AND (subtitle IS NULL OR subtitle = '');
-            UPDATE trackers SET emoji = '📘', subtitle = 'Daily Input • 1 Lesson • 10 New Words • Speaking Practice', theme = 'theme-english' 
-            WHERE id = 'english' AND (subtitle IS NULL OR subtitle = '');
-            UPDATE trackers SET emoji = '🌿', subtitle = 'Movement • Balanced Eating • Mindfulness • Sleep • Daily Metrics', theme = 'theme-health' 
-            WHERE id = 'health' AND (subtitle IS NULL OR subtitle = '');
-        ");
     }
 
     /**

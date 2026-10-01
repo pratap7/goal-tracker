@@ -4,7 +4,8 @@ declare(strict_types=1);
 /**
  * ApiController
  * 
- * Object-oriented Controller orchestrating REST API requests for GoalTracker.
+ * Object-oriented Controller orchestrating REST API requests for GoalTracker SaaS.
+ * Provides multi-tenant security, session handling, and simple Email + 4-digit PIN auth.
  */
 class ApiController
 {
@@ -12,17 +13,20 @@ class ApiController
     private TrackerRepository $trackerRepo;
     private ChallengeRepository $challengeRepo;
     private DailyTaskRepository $dailyTaskRepo;
+    private UserRepository $userRepo;
 
     public function __construct(
         ?Database $db = null,
         ?TrackerRepository $trackerRepo = null,
         ?ChallengeRepository $challengeRepo = null,
-        ?DailyTaskRepository $dailyTaskRepo = null
+        ?DailyTaskRepository $dailyTaskRepo = null,
+        ?UserRepository $userRepo = null
     ) {
         $this->db = $db ?? Database::getInstance();
         $this->trackerRepo = $trackerRepo ?? new TrackerRepository($this->db);
         $this->challengeRepo = $challengeRepo ?? new ChallengeRepository($this->db);
         $this->dailyTaskRepo = $dailyTaskRepo ?? new DailyTaskRepository($this->db);
+        $this->userRepo = $userRepo ?? new UserRepository($this->db);
     }
 
     /**
@@ -41,6 +45,28 @@ class ApiController
                     $this->actionStatus();
                     break;
 
+                // SaaS Authentication Endpoints
+                case 'signup':
+                case 'register':
+                    $this->actionSignup();
+                    break;
+
+                case 'login':
+                case 'signin':
+                    $this->actionLogin();
+                    break;
+
+                case 'logout':
+                case 'signout':
+                    $this->actionLogout();
+                    break;
+
+                case 'me':
+                case 'current_user':
+                    $this->actionGetCurrentUser();
+                    break;
+
+                // Multi-Tenant Domain Endpoints
                 case 'get_all':
                     $this->actionGetAll();
                     break;
@@ -71,6 +97,10 @@ class ApiController
 
                 case 'save_tracker_meta':
                     $this->actionSaveTrackerMeta();
+                    break;
+
+                case 'init_template':
+                    $this->actionInitTemplate();
                     break;
 
                 case 'save_challenge':
@@ -154,11 +184,66 @@ class ApiController
     }
 
     /**
+     * Extract bearer token from Authorization header or parameters.
+     */
+    private function getAuthToken(): ?string
+    {
+        $header = $_SERVER['HTTP_AUTHORIZATION'] ?? ($_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '');
+        if (empty($header) && function_exists('apache_request_headers')) {
+            $headers = apache_request_headers();
+            $header = $headers['Authorization'] ?? ($headers['authorization'] ?? '');
+        }
+
+        if (!empty($header) && preg_match('/Bearer\s+(\S+)/i', $header, $matches)) {
+            return trim($matches[1]);
+        }
+
+        if (!empty($_GET['token'])) {
+            return trim((string)$_GET['token']);
+        }
+        if (!empty($_POST['token'])) {
+            return trim((string)$_POST['token']);
+        }
+
+        $input = $this->getJsonInput();
+        if (!empty($input['token'])) {
+            return trim((string)$input['token']);
+        }
+
+        return null;
+    }
+
+    /**
+     * Retrieve currently authenticated user or null.
+     */
+    public function getAuthenticatedUser(): ?array
+    {
+        $token = $this->getAuthToken();
+        if (!$token) {
+            return null;
+        }
+        return $this->userRepo->authenticate($token);
+    }
+
+    /**
+     * Enforce authentication or abort with 401 response.
+     */
+    private function requireUser(): array
+    {
+        $user = $this->getAuthenticatedUser();
+        if (!$user) {
+            ApiResponse::error('Authentication required. Please log in with your email and 4-digit PIN.', 401);
+            exit;
+        }
+        return $user;
+    }
+
+    /**
      * System status / health check.
      */
     private function actionStatus(): void
     {
-        $tables = ['trackers', 'tracker_days', 'tracker_goals', 'tracker_rewards', 'challenges', 'daily_tasks'];
+        $tables = ['users', 'trackers', 'tracker_days', 'tracker_goals', 'tracker_rewards', 'challenges', 'daily_tasks'];
         $counts = [];
         foreach ($tables as $t) {
             $counts[$t] = (int)$this->db->fetchColumn("SELECT COUNT(*) FROM `{$t}`");
@@ -168,29 +253,166 @@ class ApiController
             'success' => true,
             'status' => 'online',
             'database' => 'goal_tracker_db',
-            'architecture' => 'OOP-PSR',
+            'architecture' => 'OOP-PSR SaaS Multi-Tenant',
             'server_time' => date('Y-m-d H:i:s'),
             'counts' => $counts
         ]);
     }
 
     /**
-     * Get all app state in one optimized request.
+     * User registration with Email and 4-digit PIN.
+     */
+    private function actionSignup(): void
+    {
+        $input = $this->getJsonInput();
+        $email = trim((string)($input['email'] ?? ($_POST['email'] ?? '')));
+        $pin = trim((string)($input['pin'] ?? ($_POST['pin'] ?? '')));
+
+        if (empty($email) || empty($pin)) {
+            ApiResponse::error('Email and 4-digit PIN are required to sign up.', 400);
+            return;
+        }
+
+        $res = $this->userRepo->register($email, $pin);
+        if (!$res['success']) {
+            ApiResponse::error($res['error'], 400);
+            return;
+        }
+
+        ApiResponse::send($res);
+    }
+
+    /**
+     * User login with Email and 4-digit PIN.
+     */
+    private function actionLogin(): void
+    {
+        $input = $this->getJsonInput();
+        $email = trim((string)($input['email'] ?? ($_POST['email'] ?? '')));
+        $pin = trim((string)($input['pin'] ?? ($_POST['pin'] ?? '')));
+
+        if (empty($email) || empty($pin)) {
+            ApiResponse::error('Email and 4-digit PIN are required to log in.', 400);
+            return;
+        }
+
+        $res = $this->userRepo->login($email, $pin);
+        if (!$res['success']) {
+            ApiResponse::error($res['error'], 401);
+            return;
+        }
+
+        ApiResponse::send($res);
+    }
+
+    /**
+     * Logout session.
+     */
+    private function actionLogout(): void
+    {
+        $token = $this->getAuthToken();
+        if ($token) {
+            $this->userRepo->logout($token);
+        }
+        ApiResponse::send(['success' => true, 'message' => 'Logged out successfully']);
+    }
+
+    /**
+     * Get current logged-in user profile.
+     */
+    private function actionGetCurrentUser(): void
+    {
+        $user = $this->getAuthenticatedUser();
+        if (!$user) {
+            ApiResponse::send(['success' => false, 'user' => null]);
+            return;
+        }
+        ApiResponse::send(['success' => true, 'user' => $user]);
+    }
+
+    /**
+     * Get all app state scoped strictly to authenticated user.
      */
     private function actionGetAll(): void
     {
+        $user = $this->requireUser();
+        $userId = $user['id'];
+
         $data = [
-            'trackers' => $this->trackerRepo->getTrackersMeta(),
-            'days' => $this->trackerRepo->getAllDays(),
-            'goals' => $this->trackerRepo->getGoals(),
-            'rewards' => $this->trackerRepo->getRewards(),
-            'challenges' => $this->challengeRepo->getAll(),
-            'dailyTasks' => $this->dailyTaskRepo->getAll()
+            'trackers' => $this->trackerRepo->getTrackersMeta($userId),
+            'days' => $this->trackerRepo->getAllDays($userId),
+            'goals' => $this->trackerRepo->getGoals($userId),
+            'rewards' => $this->trackerRepo->getRewards($userId),
+            'challenges' => $this->challengeRepo->getAll($userId),
+            'dailyTasks' => $this->dailyTaskRepo->getAll($userId)
         ];
 
         ApiResponse::send([
             'success' => true,
+            'user' => $user,
             'data' => $data
+        ]);
+    }
+
+    /**
+     * Initialize a starter template goal for the user.
+     */
+    private function actionInitTemplate(): void
+    {
+        $user = $this->requireUser();
+        $input = $this->getJsonInput();
+        $templateKey = trim((string)($input['template'] ?? ''));
+
+        $templates = [
+            'german' => [
+                'id' => 'german',
+                'title' => 'A1 German Mastery',
+                'totalDays' => 50,
+                'emoji' => '🇩🇪',
+                'subtitle' => 'Grammar • 1 Book Lesson • Song • Teach-back Video • Speaking AI',
+                'theme' => 'theme-german'
+            ],
+            'english' => [
+                'id' => 'english',
+                'title' => 'English Fluency Pro',
+                'totalDays' => 100,
+                'emoji' => '📘',
+                'subtitle' => 'Daily Input • 1 Lesson • 10 New Words • Speaking Practice',
+                'theme' => 'theme-english'
+            ],
+            'health' => [
+                'id' => 'health',
+                'title' => 'Health & Vitality 100',
+                'totalDays' => 100,
+                'emoji' => '🌿',
+                'subtitle' => 'Movement • Balanced Eating • Mindfulness • Sleep • Daily Metrics',
+                'theme' => 'theme-health'
+            ]
+        ];
+
+        if (!isset($templates[$templateKey])) {
+            ApiResponse::error('Invalid template key.', 400);
+            return;
+        }
+
+        $tpl = $templates[$templateKey];
+        $startDate = date('Y-m-d');
+
+        $this->trackerRepo->saveTrackerMeta(
+            $user['id'],
+            $tpl['id'],
+            $tpl['title'],
+            $tpl['totalDays'],
+            $startDate,
+            $tpl['emoji'],
+            $tpl['subtitle'],
+            $tpl['theme']
+        );
+
+        ApiResponse::send([
+            'success' => true,
+            'message' => "{$tpl['title']} added to your dashboard!",
+            'trackerId' => $tpl['id']
         ]);
     }
 
@@ -199,6 +421,7 @@ class ApiController
      */
     private function actionSaveDay(): void
     {
+        $user = $this->requireUser();
         $input = $this->getJsonInput();
         $trackerId = trim($input['trackerId'] ?? '');
         $day = (int)($input['day'] ?? 0);
@@ -217,6 +440,7 @@ class ApiController
         $customTitle = isset($input['customTitle']) ? trim((string)$input['customTitle']) : null;
 
         $this->trackerRepo->saveDay(
+            $user['id'],
             $trackerId,
             $day,
             $tasks,
@@ -241,6 +465,7 @@ class ApiController
      */
     private function actionSaveDayTitle(): void
     {
+        $user = $this->requireUser();
         $input = $this->getJsonInput();
         $trackerId = trim($input['trackerId'] ?? '');
         $day = (int)($input['day'] ?? 0);
@@ -250,7 +475,7 @@ class ApiController
             ApiResponse::error('Missing trackerId or day', 400);
         }
 
-        $this->trackerRepo->saveDayTitle($trackerId, $day, $title);
+        $this->trackerRepo->saveDayTitle($user['id'], $trackerId, $day, $title);
         ApiResponse::send(['success' => true]);
     }
 
@@ -259,6 +484,7 @@ class ApiController
      */
     private function actionSaveDayTasks(): void
     {
+        $user = $this->requireUser();
         $input = $this->getJsonInput();
         $trackerId = trim($input['trackerId'] ?? '');
         $day = (int)($input['day'] ?? 0);
@@ -268,7 +494,7 @@ class ApiController
             ApiResponse::error('Missing parameters', 400);
         }
 
-        $this->trackerRepo->saveDayTasks($trackerId, $day, $tasks);
+        $this->trackerRepo->saveDayTasks($user['id'], $trackerId, $day, $tasks);
         ApiResponse::send(['success' => true]);
     }
 
@@ -277,6 +503,7 @@ class ApiController
      */
     private function actionBatchSaveDays(): void
     {
+        $user = $this->requireUser();
         $input = $this->getJsonInput();
         $trackerId = trim($input['trackerId'] ?? '');
         $daysData = $input['days'] ?? [];
@@ -285,7 +512,7 @@ class ApiController
             ApiResponse::error('Invalid batch data', 400);
         }
 
-        $count = $this->trackerRepo->batchSaveDays($trackerId, $daysData);
+        $count = $this->trackerRepo->batchSaveDays($user['id'], $trackerId, $daysData);
         ApiResponse::send([
             'success' => true,
             'message' => "Batch saved {$count} days for {$trackerId}"
@@ -297,6 +524,7 @@ class ApiController
      */
     private function actionSaveGoals(): void
     {
+        $user = $this->requireUser();
         $input = $this->getJsonInput();
         $trackerId = trim($input['trackerId'] ?? '');
         $goals = $input['goals'] ?? [];
@@ -305,7 +533,7 @@ class ApiController
             ApiResponse::error('Missing trackerId', 400);
         }
 
-        $this->trackerRepo->saveGoals($trackerId, $goals);
+        $this->trackerRepo->saveGoals($user['id'], $trackerId, $goals);
         ApiResponse::send(['success' => true, 'message' => "Goals updated for {$trackerId}"]);
     }
 
@@ -314,6 +542,7 @@ class ApiController
      */
     private function actionSaveRewards(): void
     {
+        $user = $this->requireUser();
         $input = $this->getJsonInput();
         $trackerId = trim($input['trackerId'] ?? '');
         $rewards = $input['rewards'] ?? [];
@@ -322,7 +551,7 @@ class ApiController
             ApiResponse::error('Missing trackerId', 400);
         }
 
-        $this->trackerRepo->saveRewards($trackerId, $rewards);
+        $this->trackerRepo->saveRewards($user['id'], $trackerId, $rewards);
         ApiResponse::send(['success' => true, 'message' => "Rewards updated for {$trackerId}"]);
     }
 
@@ -331,6 +560,7 @@ class ApiController
      */
     private function actionSaveTrackerMeta(): void
     {
+        $user = $this->requireUser();
         $input = $this->getJsonInput();
         $trackerId = trim($input['trackerId'] ?? '');
         $title = trim($input['title'] ?? '');
@@ -349,7 +579,17 @@ class ApiController
             ApiResponse::error('Missing goal title', 400);
         }
 
-        $this->trackerRepo->saveTrackerMeta($trackerId, $title, $totalDays, $startDate, $emoji, $subtitle, $theme);
+        $this->trackerRepo->saveTrackerMeta(
+            $user['id'],
+            $trackerId,
+            $title,
+            $totalDays,
+            $startDate,
+            $emoji,
+            $subtitle,
+            $theme
+        );
+
         ApiResponse::send([
             'success' => true,
             'message' => "Goal '{$title}' saved successfully",
@@ -362,6 +602,7 @@ class ApiController
      */
     private function actionDeleteTracker(): void
     {
+        $user = $this->requireUser();
         $input = $this->getJsonInput();
         $trackerId = trim($input['trackerId'] ?? '');
 
@@ -369,7 +610,7 @@ class ApiController
             ApiResponse::error('Missing trackerId', 400);
         }
 
-        $this->trackerRepo->deleteTracker($trackerId);
+        $this->trackerRepo->deleteTracker($user['id'], $trackerId);
         ApiResponse::send([
             'success' => true,
             'message' => "Goal '{$trackerId}' deleted successfully"
@@ -381,6 +622,9 @@ class ApiController
      */
     private function actionSaveChallenge(): void
     {
+        $user = $this->requireUser();
+        $userId = $user['id'];
+
         $input = $this->getJsonInput();
         $id = (string)($input['id'] ?? ('ch_' . time()));
         $title = trim($input['title'] ?? '');
@@ -395,14 +639,14 @@ class ApiController
             ApiResponse::error('Missing challenge title', 400);
         }
 
-        // Limit to max 5 active challenges
-        if (!$this->challengeRepo->exists($id) && $status === 'active') {
-            if ($this->challengeRepo->getActiveCount() >= 5) {
+        // Limit to max 5 active challenges per user
+        if (!$this->challengeRepo->exists($userId, $id) && $status === 'active') {
+            if ($this->challengeRepo->getActiveCount($userId) >= 5) {
                 ApiResponse::error('Maximum 5 active challenges allowed. Please complete or archive an existing challenge.', 400);
             }
         }
 
-        $this->challengeRepo->save($id, $title, $days, $startDate, $status, $reward, $note, $rewardRedeemed);
+        $this->challengeRepo->save($userId, $id, $title, $days, $startDate, $status, $reward, $note, $rewardRedeemed);
         ApiResponse::send(['success' => true, 'id' => $id, 'message' => "Challenge saved"]);
     }
 
@@ -411,6 +655,7 @@ class ApiController
      */
     private function actionRedeemChallenge(): void
     {
+        $user = $this->requireUser();
         $input = $this->getJsonInput();
         $id = (string)($input['id'] ?? '');
         $note = trim((string)($input['completionNote'] ?? ''));
@@ -419,7 +664,7 @@ class ApiController
             ApiResponse::error('Missing challenge id', 400);
         }
 
-        $this->challengeRepo->redeem($id, $note);
+        $this->challengeRepo->redeem($user['id'], $id, $note);
         ApiResponse::send(['success' => true, 'message' => "Reward redeemed and note saved!"]);
     }
 
@@ -428,6 +673,7 @@ class ApiController
      */
     private function actionArchiveChallenge(): void
     {
+        $user = $this->requireUser();
         $input = $this->getJsonInput();
         $id = (string)($input['id'] ?? ($_GET['id'] ?? ''));
 
@@ -435,7 +681,7 @@ class ApiController
             ApiResponse::error('Missing challenge id', 400);
         }
 
-        $this->challengeRepo->archive($id);
+        $this->challengeRepo->archive($user['id'], $id);
         ApiResponse::send(['success' => true, 'message' => "Challenge moved to archive"]);
     }
 
@@ -444,6 +690,7 @@ class ApiController
      */
     private function actionUnarchiveChallenge(): void
     {
+        $user = $this->requireUser();
         $input = $this->getJsonInput();
         $id = (string)($input['id'] ?? '');
 
@@ -451,11 +698,11 @@ class ApiController
             ApiResponse::error('Missing challenge id', 400);
         }
 
-        if ($this->challengeRepo->getActiveCount() >= 5) {
+        if ($this->challengeRepo->getActiveCount($user['id']) >= 5) {
             ApiResponse::error('Cannot unarchive: already 5 active challenges.', 400);
         }
 
-        $this->challengeRepo->unarchive($id);
+        $this->challengeRepo->unarchive($user['id'], $id);
         ApiResponse::send(['success' => true, 'message' => "Challenge restored from archive"]);
     }
 
@@ -464,6 +711,7 @@ class ApiController
      */
     private function actionDeleteChallenge(): void
     {
+        $user = $this->requireUser();
         $input = $this->getJsonInput();
         $id = (string)($input['id'] ?? ($_GET['id'] ?? ''));
 
@@ -471,7 +719,7 @@ class ApiController
             ApiResponse::error('Missing challenge id', 400);
         }
 
-        $this->challengeRepo->delete($id);
+        $this->challengeRepo->delete($user['id'], $id);
         ApiResponse::send(['success' => true, 'message' => "Challenge {$id} deleted"]);
     }
 
@@ -480,6 +728,7 @@ class ApiController
      */
     private function actionSaveDailyTask(): void
     {
+        $user = $this->requireUser();
         $input = $this->getJsonInput();
         $id = (string)($input['id'] ?? ('dt_' . round(microtime(true) * 1000)));
         $taskDate = (string)($input['taskDate'] ?? date('Y-m-d'));
@@ -490,7 +739,7 @@ class ApiController
         }
 
         $done = isset($input['done']) ? !empty($input['done']) : null;
-        $this->dailyTaskRepo->save($id, $taskDate, $title, $done);
+        $this->dailyTaskRepo->save($user['id'], $id, $taskDate, $title, $done);
 
         ApiResponse::send(['success' => true, 'id' => $id]);
     }
@@ -500,6 +749,7 @@ class ApiController
      */
     private function actionToggleDailyTask(): void
     {
+        $user = $this->requireUser();
         $input = $this->getJsonInput();
         $id = (string)($input['id'] ?? '');
         $done = !empty($input['done']);
@@ -508,7 +758,7 @@ class ApiController
             ApiResponse::error('Missing task id', 400);
         }
 
-        $this->dailyTaskRepo->toggle($id, $done);
+        $this->dailyTaskRepo->toggle($user['id'], $id, $done);
         ApiResponse::send(['success' => true]);
     }
 
@@ -517,6 +767,7 @@ class ApiController
      */
     private function actionDeleteDailyTask(): void
     {
+        $user = $this->requireUser();
         $input = $this->getJsonInput();
         $id = (string)($input['id'] ?? '');
 
@@ -524,7 +775,7 @@ class ApiController
             ApiResponse::error('Missing task id', 400);
         }
 
-        $this->dailyTaskRepo->delete($id);
+        $this->dailyTaskRepo->delete($user['id'], $id);
         ApiResponse::send(['success' => true]);
     }
 
@@ -533,6 +784,7 @@ class ApiController
      */
     private function actionResetTracker(): void
     {
+        $user = $this->requireUser();
         $input = $this->getJsonInput();
         $trackerId = trim((string)($input['trackerId'] ?? ''));
 
@@ -540,24 +792,28 @@ class ApiController
             ApiResponse::error('Missing trackerId', 400);
         }
 
-        $this->trackerRepo->resetTracker($trackerId);
+        $this->trackerRepo->resetTracker($user['id'], $trackerId);
         ApiResponse::send(['success' => true, 'message' => "Reset tracker {$trackerId} in MySQL"]);
     }
 
     /**
-     * Export all data.
+     * Export all data for authenticated user.
      */
     private function actionExport(): void
     {
-        $trackers = $this->db->fetchAll("SELECT * FROM trackers");
-        $days = $this->db->fetchAll("SELECT * FROM tracker_days");
-        $goals = $this->db->fetchAll("SELECT * FROM tracker_goals");
-        $rewards = $this->db->fetchAll("SELECT * FROM tracker_rewards");
-        $challenges = $this->db->fetchAll("SELECT * FROM challenges");
-        $dailyTasks = $this->db->fetchAll("SELECT * FROM daily_tasks");
+        $user = $this->requireUser();
+        $uid = $user['id'];
+
+        $trackers = $this->db->fetchAll("SELECT * FROM trackers WHERE user_id = :uid", [':uid' => $uid]);
+        $days = $this->db->fetchAll("SELECT * FROM tracker_days WHERE user_id = :uid", [':uid' => $uid]);
+        $goals = $this->db->fetchAll("SELECT * FROM tracker_goals WHERE user_id = :uid", [':uid' => $uid]);
+        $rewards = $this->db->fetchAll("SELECT * FROM tracker_rewards WHERE user_id = :uid", [':uid' => $uid]);
+        $challenges = $this->db->fetchAll("SELECT * FROM challenges WHERE user_id = :uid", [':uid' => $uid]);
+        $dailyTasks = $this->db->fetchAll("SELECT * FROM daily_tasks WHERE user_id = :uid", [':uid' => $uid]);
 
         ApiResponse::send([
             'success' => true,
+            'user' => $user,
             'exported_at' => date('c'),
             'data' => [
                 'trackers' => $trackers,

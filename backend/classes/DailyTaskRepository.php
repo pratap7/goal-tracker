@@ -5,6 +5,7 @@ declare(strict_types=1);
  * DailyTaskRepository
  * 
  * Object-oriented Data Access Layer for custom daily tasks on Today's command center.
+ * Fully multi-tenant with strict user scoping.
  */
 class DailyTaskRepository {
     private Database $db;
@@ -14,10 +15,11 @@ class DailyTaskRepository {
     }
 
     /**
-     * Get all daily custom tasks ordered by creation time.
+     * Get all daily custom tasks for a user ordered by creation time.
      */
-    public function getAll(): array {
-        $rows = $this->db->fetchAll("SELECT id, task_date, title, done, created_at FROM daily_tasks ORDER BY created_at ASC");
+    public function getAll(int $userId = 1): array {
+        $sql = "SELECT id, task_date, title, done, created_at FROM daily_tasks WHERE user_id = :uid ORDER BY created_at ASC";
+        $rows = $this->db->fetchAll($sql, [':uid' => $userId]);
         $tasks = [];
         foreach ($rows as $drow) {
             $tasks[] = [
@@ -32,11 +34,11 @@ class DailyTaskRepository {
     }
 
     /**
-     * Get custom tasks for a specific date.
+     * Get custom tasks for a specific date and user.
      */
-    public function getByDate(string $date): array {
-        $sql = "SELECT id, task_date, title, done, created_at FROM daily_tasks WHERE task_date = :tdate ORDER BY created_at ASC";
-        $rows = $this->db->fetchAll($sql, [':tdate' => $date]);
+    public function getByDate(int $userId, string $date): array {
+        $sql = "SELECT id, task_date, title, done, created_at FROM daily_tasks WHERE user_id = :uid AND task_date = :tdate ORDER BY created_at ASC";
+        $rows = $this->db->fetchAll($sql, [':uid' => $userId, ':tdate' => $date]);
         $tasks = [];
         foreach ($rows as $drow) {
             $tasks[] = [
@@ -51,25 +53,27 @@ class DailyTaskRepository {
     }
 
     /**
-     * Save or update custom task title and done status.
+     * Save or update custom task title and done status for a user.
      */
-    public function save(string $id, string $taskDate, string $title, ?bool $done = null): bool {
+    public function save(int $userId, string $id, string $taskDate, string $title, ?bool $done = null): bool {
         if ($done !== null) {
-            $sql = "INSERT INTO daily_tasks (id, task_date, title, done, created_at)
-                    VALUES (:id, :tdate, :title, :done, NOW())
+            $sql = "INSERT INTO daily_tasks (id, user_id, task_date, title, done, created_at)
+                    VALUES (:id, :uid, :tdate, :title, :done, NOW())
                     ON DUPLICATE KEY UPDATE title = VALUES(title), done = VALUES(done)";
             return $this->db->execute($sql, [
                 ':id' => $id,
+                ':uid' => $userId,
                 ':tdate' => $taskDate,
                 ':title' => $title,
                 ':done' => $done ? 1 : 0
             ]);
         } else {
-            $sql = "INSERT INTO daily_tasks (id, task_date, title, done, created_at)
-                    VALUES (:id, :tdate, :title, 0, NOW())
+            $sql = "INSERT INTO daily_tasks (id, user_id, task_date, title, done, created_at)
+                    VALUES (:id, :uid, :tdate, :title, 0, NOW())
                     ON DUPLICATE KEY UPDATE title = VALUES(title)";
             return $this->db->execute($sql, [
                 ':id' => $id,
+                ':uid' => $userId,
                 ':tdate' => $taskDate,
                 ':title' => $title
             ]);
@@ -77,19 +81,23 @@ class DailyTaskRepository {
     }
 
     /**
-     * Toggle completion state.
+     * Toggle completion state for a user.
      */
-    public function toggle(string $id, bool $done): bool {
-        return $this->db->execute("UPDATE daily_tasks SET done = :done WHERE id = :id", [
+    public function toggle(int $userId, string $id, bool $done): bool {
+        return $this->db->execute("UPDATE daily_tasks SET done = :done WHERE user_id = :uid AND id = :id", [
+            ':uid' => $userId,
             ':id' => $id,
             ':done' => $done ? 1 : 0
         ]);
     }
 
     /**
-     * Delete a custom task.
+     * Delete a custom task for a user.
      */
-    public function delete(string $id): bool {
-        return $this->db->execute("DELETE FROM daily_tasks WHERE id = :id", [':id' => $id]);
+    public function delete(int $userId, string $id): bool {
+        return $this->db->execute("DELETE FROM daily_tasks WHERE user_id = :uid AND id = :id", [
+            ':uid' => $userId,
+            ':id' => $id
+        ]);
     }
 }
