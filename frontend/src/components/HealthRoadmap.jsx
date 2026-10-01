@@ -222,33 +222,39 @@ export default function HealthRoadmap({ setActivePage }) {
         </div>
       </div>
 
-      <div className="tracker-hero-card">
-        <div className="tracker-title-row">
-          <div className="tracker-badge-title">
-            <span className="tracker-icon-lg">🌿</span>
-            <div>
-              <div className="tracker-pretitle">100-DAY LIFELONG HABITS</div>
-              <h1 className="tracker-h1">Health & Vitality 100</h1>
-            </div>
+      {/* Detail Hero Card */}
+      <div className="detail-hero">
+        <div className="detail-hero-top">
+          <div className="detail-hero-titles">
+            <h2>
+              <span>🌿</span> Health & Vitality 100
+            </h2>
+            <p>100-Day Lifelong Habits: Daily movement, mindful nutrition, hydration, sleep hygiene, and vitality tracking.</p>
           </div>
-          <div className="start-date-control">
-            <label className="start-date-label">Start Date:</label>
+          <div className="start-date-badge">
+            <span>📅 Start Date:</span>
             <input
               type="date"
-              className="start-date-input"
               value={startDate}
               onChange={(e) => handleStartDateChange(e.target.value)}
             />
           </div>
         </div>
 
-        <div className="progress-section-large">
-          <div className="progress-text-row">
-            <span>Overall Progress</span>
-            <span className="progress-fraction">{doneDays} of 100 Days Completed ({pct}%)</span>
+        <div style={{ marginTop: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+              Overall Roadmap Progress
+            </span>
+            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-main)' }}>
+              {doneDays} of 100 Days Completed ({pct}%)
+            </span>
           </div>
-          <div className="progress-bar-bg large">
-            <div className="progress-bar-fill health" style={{ width: `${pct}%` }} />
+          <div className="progress-bar-bg" style={{ height: '10px' }}>
+            <div
+              className="progress-bar-fill theme-health"
+              style={{ width: `${pct}%` }}
+            />
           </div>
         </div>
       </div>
@@ -482,18 +488,19 @@ function HealthRewardsWidget({ rewards, doneDays, onSave, showEditor, setShowEdi
       </div>
 
       {!showEditor && (
-        <div className="rewards-grid">
+        <div className="rewards-list">
           {milestones.map(m => {
             const unlocked = doneDays >= m;
             return (
-              <div key={m} className={`reward-card-item ${unlocked ? 'unlocked' : ''}`}>
-                <div className="reward-top-row">
-                  <span className={`reward-pill ${unlocked ? 'unlocked' : ''}`}>Day {m}</span>
-                  <span className="reward-icon-status">{unlocked ? "🎁 UNLOCKED" : "🔒 LOCKED"}</span>
-                </div>
-                <div className="reward-title-txt">{rewards[m] || `Milestone ${m} Reward`}</div>
-                <div className="reward-sub-txt">
-                  {unlocked ? "Claimed upon completion!" : `${m - doneDays} days remaining`}
+              <div key={m} className={`reward-item ${unlocked ? 'unlocked' : ''}`}>
+                <div className="reward-badge-icon">{unlocked ? "🎁" : "🔒"}</div>
+                <div className="reward-info">
+                  <div className={`reward-title-str ${unlocked ? '' : 'locked'}`}>
+                    Day {m}: {rewards[m] || `Milestone ${m} Reward`}
+                  </div>
+                  <div className={`reward-sub-str ${unlocked ? 'unlocked' : ''}`}>
+                    {unlocked ? "✓ Unlocked & Claimed!" : `${m - doneDays} days remaining`}
+                  </div>
                 </div>
               </div>
             );
@@ -643,70 +650,64 @@ function HealthDayCard({ dayNum, topic, tip, dayDate, dayData, updateDay }) {
             </button>
           </div>
 
-          <div className="metrics-section-title">📊 Daily Physical & Health Stats</div>
+          <div className="metrics-header-label">📊 Daily Physical & Health Stats</div>
           <div className="metrics-inputs-grid">
-            <div className="metric-input-card">
-              <span className="metric-input-label">Water Intake (L)</span>
+            <div className="metric-input-box">
+              <label>Water Intake (L)</label>
               <input
                 type="number"
                 step="0.1"
-                className="metric-field"
                 placeholder="e.g. 2.5"
                 value={dayData.metrics?.water || ""}
                 onChange={(e) => updateMetric('water', e.target.value)}
               />
             </div>
 
-            <div className="metric-input-card">
-              <span className="metric-input-label">Steps Walked</span>
+            <div className="metric-input-box">
+              <label>Steps Walked</label>
               <input
                 type="number"
-                className="metric-field"
                 placeholder="e.g. 10000"
                 value={dayData.metrics?.steps || ""}
                 onChange={(e) => updateMetric('steps', e.target.value)}
               />
             </div>
 
-            <div className="metric-input-card">
-              <span className="metric-input-label">Push-ups</span>
+            <div className="metric-input-box">
+              <label>Push-ups</label>
               <input
                 type="number"
-                className="metric-field"
                 placeholder="e.g. 50"
                 value={dayData.metrics?.pushups || ""}
                 onChange={(e) => updateMetric('pushups', e.target.value)}
               />
             </div>
 
-            <div className="metric-input-card">
-              <span className="metric-input-label">Squats</span>
+            <div className="metric-input-box">
+              <label>Squats</label>
               <input
                 type="number"
-                className="metric-field"
                 placeholder="e.g. 60"
                 value={dayData.metrics?.squats || ""}
                 onChange={(e) => updateMetric('squats', e.target.value)}
               />
             </div>
 
-            <div className="metric-input-card">
-              <span className="metric-input-label">Rope Skips</span>
+            <div className="metric-input-box">
+              <label>Rope Skips</label>
               <input
                 type="number"
-                className="metric-field"
                 placeholder="e.g. 300"
                 value={dayData.metrics?.ropeSkips || ""}
                 onChange={(e) => updateMetric('ropeSkips', e.target.value)}
               />
             </div>
 
-            <div className="metric-input-card">
-              <span className="metric-input-label">Running (km)</span>
+            <div className="metric-input-box">
+              <label>Running (km)</label>
               <input
                 type="number"
                 step="0.1"
-                className="metric-field"
                 placeholder="e.g. 3.2"
                 value={dayData.metrics?.runKm || ""}
                 onChange={(e) => updateMetric('runKm', e.target.value)}

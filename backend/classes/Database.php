@@ -236,6 +236,30 @@ class Database
         if (!$checkTitle) {
             $this->pdo->exec("ALTER TABLE tracker_days ADD COLUMN custom_title VARCHAR(255) NULL");
         }
+
+        // Incremental column migrations for trackers table
+        $trackerCols = [
+            'emoji' => "VARCHAR(32) DEFAULT '🎯'",
+            'subtitle' => 'VARCHAR(255) NULL',
+            'theme' => "VARCHAR(50) DEFAULT 'theme-german'",
+            'status' => "VARCHAR(20) DEFAULT 'active'"
+        ];
+        foreach ($trackerCols as $col => $type) {
+            $check = $this->pdo->query("SHOW COLUMNS FROM trackers LIKE '{$col}'")->fetch();
+            if (!$check) {
+                $this->pdo->exec("ALTER TABLE trackers ADD COLUMN {$col} {$type}");
+            }
+        }
+
+        // Populate default tracker metadata for built-in goals
+        $this->pdo->exec("
+            UPDATE trackers SET emoji = '🇩🇪', subtitle = 'Grammar • 1 Book Lesson • Song • Teach-back Video • Speaking AI', theme = 'theme-german' 
+            WHERE id = 'german' AND (subtitle IS NULL OR subtitle = '');
+            UPDATE trackers SET emoji = '📘', subtitle = 'Daily Input • 1 Lesson • 10 New Words • Speaking Practice', theme = 'theme-english' 
+            WHERE id = 'english' AND (subtitle IS NULL OR subtitle = '');
+            UPDATE trackers SET emoji = '🌿', subtitle = 'Movement • Balanced Eating • Mindfulness • Sleep • Daily Metrics', theme = 'theme-health' 
+            WHERE id = 'health' AND (subtitle IS NULL OR subtitle = '');
+        ");
     }
 
     /**

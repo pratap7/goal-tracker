@@ -6,20 +6,17 @@ declare(strict_types=1);
  * 
  * Object-oriented Data Access Layer for custom daily tasks on Today's command center.
  */
-class DailyTaskRepository
-{
+class DailyTaskRepository {
     private Database $db;
 
-    public function __construct(?Database $db = null)
-    {
+    public function __construct(?Database $db = null) {
         $this->db = $db ?? Database::getInstance();
     }
 
     /**
      * Get all daily custom tasks ordered by creation time.
      */
-    public function getAll(): array
-    {
+    public function getAll(): array {
         $rows = $this->db->fetchAll("SELECT id, task_date, title, done, created_at FROM daily_tasks ORDER BY created_at ASC");
         $tasks = [];
         foreach ($rows as $drow) {
@@ -37,8 +34,7 @@ class DailyTaskRepository
     /**
      * Get custom tasks for a specific date.
      */
-    public function getByDate(string $date): array
-    {
+    public function getByDate(string $date): array {
         $sql = "SELECT id, task_date, title, done, created_at FROM daily_tasks WHERE task_date = :tdate ORDER BY created_at ASC";
         $rows = $this->db->fetchAll($sql, [':tdate' => $date]);
         $tasks = [];
@@ -57,8 +53,7 @@ class DailyTaskRepository
     /**
      * Save or update custom task title and done status.
      */
-    public function save(string $id, string $taskDate, string $title, ?bool $done = null): bool
-    {
+    public function save(string $id, string $taskDate, string $title, ?bool $done = null): bool {
         if ($done !== null) {
             $sql = "INSERT INTO daily_tasks (id, task_date, title, done, created_at)
                     VALUES (:id, :tdate, :title, :done, NOW())
@@ -84,8 +79,7 @@ class DailyTaskRepository
     /**
      * Toggle completion state.
      */
-    public function toggle(string $id, bool $done): bool
-    {
+    public function toggle(string $id, bool $done): bool {
         return $this->db->execute("UPDATE daily_tasks SET done = :done WHERE id = :id", [
             ':id' => $id,
             ':done' => $done ? 1 : 0
@@ -95,8 +89,7 @@ class DailyTaskRepository
     /**
      * Delete a custom task.
      */
-    public function delete(string $id): bool
-    {
+    public function delete(string $id): bool {
         return $this->db->execute("DELETE FROM daily_tasks WHERE id = :id", [':id' => $id]);
     }
 }

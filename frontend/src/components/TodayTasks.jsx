@@ -497,62 +497,56 @@ export default function TodayTasks({ setActivePage }) {
 
   return (
     <>
-      {/* Date Header & Action Bar */}
-      <div className="today-header-bar">
+      {/* Today Hero & Progress Overview */}
+      <div className="today-hero">
+        <div className="today-hero-top">
+          <div>
+            <div className="today-date-badge">
+              <span>⚡</span>
+              <span>Daily Command Center</span>
+              <span style={{ fontSize: '0.8rem', opacity: 0.85 }}>
+                {selectedDate === todayStr() ? "• Today's Focus" : "• Historical Log"}
+              </span>
+            </div>
+            <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.5px', marginTop: '10px' }}>
+              {formattedDate}
+            </h2>
+          </div>
+
+          <div className="today-date-nav">
+            <button type="button" onClick={() => shiftDate(-1)}>
+              ← Prev
+            </button>
+            <button
+              type="button"
+              style={selectedDate === todayStr() ? { background: 'var(--border-focus)', color: '#fff', borderColor: 'var(--border-focus)' } : {}}
+              onClick={() => setSelectedDate(todayStr())}
+            >
+              Today
+            </button>
+            <button type="button" onClick={() => shiftDate(1)}>
+              Next →
+            </button>
+            <input
+              type="date"
+              className="today-metric-input"
+              style={{ width: 'auto', padding: '4px 8px', cursor: 'pointer' }}
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+            />
+          </div>
+        </div>
+
+        {/* Progress bar */}
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-            <span style={{ fontSize: '1.4rem' }}>⚡</span>
-            <span className="today-cat-badge sprint">Daily Command Center</span>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-dim)', fontWeight: 600 }}>
-              {selectedDate === todayStr() ? "• Today's Focus" : "• Historical Log"}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
+            <span style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--text-muted)' }}>
+              Daily Execution Score ({doneCount} of {totalCount} Tasks Completed)
             </span>
-          </div>
-          <h2 style={{ fontSize: '1.6rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.5px' }}>
-            {formattedDate}
-          </h2>
-        </div>
-
-        <div className="date-nav-controls">
-          <button type="button" className="date-nav-btn" onClick={() => shiftDate(-1)}>
-            ← Prev Day
-          </button>
-          <button
-            type="button"
-            className="date-nav-btn"
-            style={selectedDate === todayStr() ? { background: 'var(--border-focus)', color: '#fff', borderColor: 'var(--border-focus)' } : {}}
-            onClick={() => setSelectedDate(todayStr())}
-          >
-            Today
-          </button>
-          <button type="button" className="date-nav-btn" onClick={() => shiftDate(1)}>
-            Next Day →
-          </button>
-          <input
-            type="date"
-            className="date-picker-input"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-          />
-        </div>
-      </div>
-
-      {/* Progress & Overview Strip */}
-      <div className="today-progress-card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-          <div>
-            <div style={{ fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.6px', color: 'var(--text-dim)', fontWeight: 800 }}>
-              Daily Execution Score
-            </div>
-            <div style={{ fontSize: '1.8rem', fontWeight: 900, color: 'var(--text-main)', lineHeight: 1.1 }}>
-              {doneCount} of {totalCount} Tasks Completed
-            </div>
-          </div>
-
-          <div>
             <span style={{
-              fontSize: '0.82rem',
+              fontSize: '0.8rem',
               fontWeight: 800,
-              padding: '6px 14px',
+              padding: '4px 12px',
               borderRadius: '999px',
               background: pct === 100 ? 'rgba(16, 185, 129, 0.2)' : 'rgba(99, 102, 241, 0.15)',
               color: pct === 100 ? '#10b981' : '#818cf8',
@@ -561,17 +555,15 @@ export default function TodayTasks({ setActivePage }) {
               {pct === 100 ? "🌟 ALL TASKS COMPLETED" : `${pct}% COMPLETED`}
             </span>
           </div>
-        </div>
-
-        {/* Progress bar */}
-        <div className="progress-bar-bg" style={{ height: '10px' }}>
-          <div
-            className="progress-bar-fill"
-            style={{
-              width: `${pct}%`,
-              background: pct === 100 ? 'linear-gradient(90deg, #10b981, #059669)' : 'linear-gradient(90deg, #6366f1, #38bdf8)'
-            }}
-          />
+          <div className="progress-bar-bg" style={{ height: '10px' }}>
+            <div
+              className="progress-bar-fill"
+              style={{
+                width: `${pct}%`,
+                background: pct === 100 ? 'linear-gradient(90deg, #10b981, #059669)' : 'linear-gradient(90deg, #6366f1, #38bdf8)'
+              }}
+            />
+          </div>
         </div>
 
         <div className="today-stats-strip">
@@ -588,7 +580,7 @@ export default function TodayTasks({ setActivePage }) {
             <span className="today-stat-val" style={{ color: pendingCount ? '#f59e0b' : '#10b981' }}>{pendingCount}</span>
           </div>
           <div className="today-stat-pill">
-            <span className="today-stat-sub">Daily Mastery</span>
+            <span className="today-stat-sub">Daily Score</span>
             <span className="today-stat-val" style={{ color: '#38bdf8' }}>{pct}%</span>
           </div>
         </div>
@@ -596,7 +588,7 @@ export default function TodayTasks({ setActivePage }) {
 
       {/* Controls Bar: Category Filters + Status Filters + Edit Mode Button */}
       <div className="controls-bar">
-        <div className="filter-chips-wrap">
+        <div className="filter-tabs">
           {[
             { id: 'all', label: `All (${totalCount})` },
             { id: 'german', label: `🇩🇪 German (${unifiedTasks.filter(t => t.type === 'german').length})` },
@@ -608,7 +600,7 @@ export default function TodayTasks({ setActivePage }) {
             <button
               key={cat.id}
               type="button"
-              className={`filter-chip ${categoryFilter === cat.id ? 'active' : ''}`}
+              className={`filter-tab ${categoryFilter === cat.id ? 'active' : ''}`}
               onClick={() => setCategoryFilter(cat.id)}
             >
               {cat.label}
@@ -617,21 +609,22 @@ export default function TodayTasks({ setActivePage }) {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          {[
-            { id: 'all', label: 'All Status' },
-            { id: 'pending', label: `Pending (${pendingCount})` },
-            { id: 'done', label: `Done (${doneCount})` }
-          ].map(st => (
-            <button
-              key={st.id}
-              type="button"
-              className={`preset-pill ${statusFilter === st.id ? 'active' : ''}`}
-              style={statusFilter === st.id ? { background: 'var(--border-focus)', color: '#fff', borderColor: 'var(--border-focus)' } : {}}
-              onClick={() => setStatusFilter(st.id)}
-            >
-              {st.label}
-            </button>
-          ))}
+          <div className="filter-tabs">
+            {[
+              { id: 'all', label: 'All' },
+              { id: 'pending', label: `Pending (${pendingCount})` },
+              { id: 'done', label: `Done (${doneCount})` }
+            ].map(st => (
+              <button
+                key={st.id}
+                type="button"
+                className={`filter-tab ${statusFilter === st.id ? 'active' : ''}`}
+                onClick={() => setStatusFilter(st.id)}
+              >
+                {st.label}
+              </button>
+            ))}
+          </div>
 
           {/* Edit Mode Button */}
           <button
@@ -938,32 +931,27 @@ export default function TodayTasks({ setActivePage }) {
       )}
 
       {/* Add Custom Task Form */}
-      <div className="add-today-task-box">
-        <div style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span>✨</span> Add Personal Goal / Task for Today ({formattedDate})
-        </div>
-        <form onSubmit={handleAddCustomTask} style={{ display: 'flex', gap: '10px' }}>
-          <input
-            type="text"
-            className="challenge-input"
-            style={{ flex: 1 }}
-            placeholder="e.g. Read 20 pages, drink 3L water, code for 1 hour..."
-            value={newCustomTitle}
-            onChange={(e) => setNewCustomTitle(e.target.value)}
-          />
-          <button type="submit" className="add-challenge-btn" style={{ whiteSpace: 'nowrap' }}>
-            + Add Task
-          </button>
-        </form>
-      </div>
+      <form className="today-custom-add-box" onSubmit={handleAddCustomTask}>
+        <span style={{ fontSize: '1.2rem' }}>✨</span>
+        <input
+          type="text"
+          className="today-custom-input"
+          placeholder={`Add personal goal or task for ${formattedDate}... (e.g. Read 20 pages, drink 3L water, finish project demo)`}
+          value={newCustomTitle}
+          onChange={(e) => setNewCustomTitle(e.target.value)}
+        />
+        <button type="submit" className="add-challenge-btn" style={{ whiteSpace: 'nowrap' }}>
+          + Add Task
+        </button>
+      </form>
 
       {/* Health Metrics Quick Logger */}
-      <div className="today-health-box">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+      <div className="today-quick-metrics">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '1.2rem' }}>🌿</span>
             <span style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text-main)' }}>
-              Health & Vitality Log (Day {healthDayNum})
+              Health & Vitality Quick Log (Day {healthDayNum})
             </span>
           </div>
           <span style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>
@@ -971,69 +959,69 @@ export default function TodayTasks({ setActivePage }) {
           </span>
         </div>
 
-        <div className="metrics-inputs-grid">
-          <div className="metric-input-card">
-            <span className="metric-input-label">Water Intake (L)</span>
+        <div className="today-metrics-grid">
+          <div className="today-metric-box">
+            <span className="today-metric-label">💧 Water (L)</span>
             <input
               type="number"
               step="0.1"
-              className="metric-field"
+              className="today-metric-input"
               placeholder="e.g. 2.5"
               value={healthMetrics.water || ""}
               onChange={(e) => handleMetricChange('water', e.target.value)}
             />
           </div>
 
-          <div className="metric-input-card">
-            <span className="metric-input-label">Total Steps</span>
+          <div className="today-metric-box">
+            <span className="today-metric-label">👟 Steps Walked</span>
             <input
               type="number"
-              className="metric-field"
+              className="today-metric-input"
               placeholder="e.g. 10000"
               value={healthMetrics.steps || ""}
               onChange={(e) => handleMetricChange('steps', e.target.value)}
             />
           </div>
 
-          <div className="metric-input-card">
-            <span className="metric-input-label">Push-ups</span>
+          <div className="today-metric-box">
+            <span className="today-metric-label">💪 Push-ups</span>
             <input
               type="number"
-              className="metric-field"
+              className="today-metric-input"
               placeholder="e.g. 50"
               value={healthMetrics.pushups || ""}
               onChange={(e) => handleMetricChange('pushups', e.target.value)}
             />
           </div>
 
-          <div className="metric-input-card">
-            <span className="metric-input-label">Squats</span>
+          <div className="today-metric-box">
+            <span className="today-metric-label">🦵 Squats</span>
             <input
               type="number"
-              className="metric-field"
+              className="today-metric-input"
               placeholder="e.g. 60"
               value={healthMetrics.squats || ""}
               onChange={(e) => handleMetricChange('squats', e.target.value)}
             />
           </div>
 
-          <div className="metric-input-card">
-            <span className="metric-input-label">Rope Skips</span>
+          <div className="today-metric-box">
+            <span className="today-metric-label">🪢 Rope Skips</span>
             <input
               type="number"
-              className="metric-field"
+              className="today-metric-input"
               placeholder="e.g. 300"
               value={healthMetrics.ropeSkips || ""}
               onChange={(e) => handleMetricChange('ropeSkips', e.target.value)}
             />
           </div>
 
-          <div className="metric-input-card">
-            <span className="metric-input-label">Running (km)</span>
+          <div className="today-metric-box">
+            <span className="today-metric-label">🏃 Running (km)</span>
             <input
               type="number"
               step="0.1"
-              className="metric-field"
+              className="today-metric-input"
               placeholder="e.g. 3.2"
               value={healthMetrics.runKm || ""}
               onChange={(e) => handleMetricChange('runKm', e.target.value)}

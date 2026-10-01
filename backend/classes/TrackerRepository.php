@@ -20,14 +20,18 @@ class TrackerRepository
      */
     public function getTrackersMeta(): array
     {
-        $rows = $this->db->fetchAll("SELECT id, title, total_days, start_date FROM trackers");
+        $rows = $this->db->fetchAll("SELECT id, title, total_days, start_date, emoji, subtitle, theme, status FROM trackers WHERE status != 'archived' ORDER BY created_at ASC");
         $trackers = [];
         foreach ($rows as $tr) {
             $trackers[$tr['id']] = [
                 'id' => $tr['id'],
                 'title' => $tr['title'],
                 'totalDays' => (int)$tr['total_days'],
-                'startDate' => $tr['start_date']
+                'startDate' => $tr['start_date'],
+                'emoji' => !empty($tr['emoji']) ? $tr['emoji'] : '🎯',
+                'subtitle' => !empty($tr['subtitle']) ? $tr['subtitle'] : '',
+                'theme' => !empty($tr['theme']) ? $tr['theme'] : 'theme-german',
+                'status' => !empty($tr['status']) ? $tr['status'] : 'active'
             ];
         }
         return $trackers;
@@ -36,22 +40,48 @@ class TrackerRepository
     /**
      * Save or update tracker metadata.
      */
-    public function saveTrackerMeta(string $id, string $title, int $totalDays, ?string $startDate): bool
-    {
-        $sql = "INSERT INTO trackers (id, title, total_days, start_date, updated_at)
-                VALUES (:id, :title, :total, :sdate, NOW())
+    public function saveTrackerMeta(
+        string $id,
+        string $title,
+        int $totalDays,
+        ?string $startDate,
+        string $emoji = '🎯',
+        string $subtitle = '',
+        string $theme = 'theme-german'
+    ): bool {
+        $sql = "INSERT INTO trackers (id, title, total_days, start_date, emoji, subtitle, theme, status, updated_at)
+                VALUES (:id, :title, :total, :sdate, :emoji, :sub, :theme, 'active', NOW())
                 ON DUPLICATE KEY UPDATE 
                     title = IF(VALUES(title) != '', VALUES(title), title),
                     total_days = IF(VALUES(total_days) > 0, VALUES(total_days), total_days),
                     start_date = VALUES(start_date),
+                    emoji = VALUES(emoji),
+                    subtitle = VALUES(subtitle),
+                    theme = VALUES(theme),
+                    status = 'active',
                     updated_at = NOW()";
 
         return $this->db->execute($sql, [
             ':id' => $id,
             ':title' => $title,
             ':total' => $totalDays,
-            ':sdate' => $startDate
+            ':sdate' => $startDate,
+            ':emoji' => $emoji,
+            ':sub' => $subtitle,
+            ':theme' => $theme
         ]);
+    }
+
+    /**
+     * Delete a goal tracker permanently.
+     */
+    public function deleteTracker(string $id): bool
+    {
+        $this->db->execute("DELETE FROM trackers WHERE id = :id", [':id' => $id]);
+        $this->db->execute("DELETE FROM tracker_days WHERE tracker_id = :id", [':id' => $id]);
+        $this->db->execute("DELETE FROM tracker_goals WHERE tracker_id = :id", [':id' => $id]);
+        $this->db->execute("DELETE FROM tracker_rewards WHERE tracker_id = :id", [':id' => $id]);
+        return true;
     }
 
     /**

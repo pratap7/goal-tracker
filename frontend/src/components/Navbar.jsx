@@ -11,11 +11,11 @@ export default function Navbar({ activePage, setActivePage, theme, toggleTheme, 
 
   return (
     <nav className="site-nav" role="navigation" aria-label="Main Navigation">
-      <div className="brand-logo" onClick={() => setActivePage('dashboard')} style={{ cursor: 'pointer' }}>
-        <div className="brand-icon">🎯</div>
-        <div className="brand-text-wrap">
-          <span className="brand-title">GoalTracker</span>
-          <span className="brand-badge">PRO</span>
+      <div className="brand-left" onClick={() => setActivePage('dashboard')} style={{ cursor: 'pointer' }}>
+        <div className="brand-icon-box">🎯</div>
+        <div className="brand-titles">
+          <h1 style={{ margin: 0 }}>GoalTracker Pro</h1>
+          <div className="tagline">Mastery &bull; Consistency &bull; Growth</div>
         </div>
       </div>
 
@@ -26,12 +26,10 @@ export default function Navbar({ activePage, setActivePage, theme, toggleTheme, 
             type="button"
             className={`nav-link-btn ${activePage === item.id ? 'active' : ''}`}
             onClick={() => setActivePage(item.id)}
-            style={{ position: 'relative' }}
           >
-            {item.label}
+            <span>{item.label}</span>
             {item.badge && (
               <span style={{
-                marginLeft: '6px',
                 fontSize: '0.62rem',
                 padding: '2px 6px',
                 borderRadius: '999px',
@@ -47,28 +45,35 @@ export default function Navbar({ activePage, setActivePage, theme, toggleTheme, 
         ))}
       </div>
 
-      <div className="nav-actions-right">
-        {/* Fullscreen Toggle */}
+      <div className="nav-actions">
+        {/* MySQL Connected Live Indicator */}
+        <div className="badge-mysql" title="MySQL Database Connected & Synced">
+          <span className="dot-pulse" />
+          <span>MySQL Live</span>
+        </div>
+
+        {/* Fullscreen Button */}
         <button
           type="button"
-          className="fullscreen-toggle-btn"
+          className="btn-icon"
           onClick={toggleFullscreen}
-          title={isFullscreen ? "Exit Full-Screen" : "Enter Full-Screen"}
+          title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
           aria-label="Toggle Fullscreen"
         >
           {isFullscreen ? "✕" : "⛶"}
         </button>
 
-        {/* Theme Toggle */}
+        {/* Theme Toggle Button */}
         <button
           type="button"
-          className="theme-toggle-btn"
+          className="theme-toggle"
           onClick={toggleTheme}
           title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`}
-          aria-label="Toggle theme"
+          aria-label="Toggle Theme"
         >
-          <span className="theme-toggle-icon">{theme === 'dark' ? '☀️' : '🌙'}</span>
-          <span className="theme-toggle-label">{theme === 'dark' ? 'Light' : 'Dark'}</span>
+          <span className="theme-toggle-slider" />
+          <span className="theme-icon sun">☀️</span>
+          <span className="theme-icon moon">🌙</span>
         </button>
       </div>
     </nav>

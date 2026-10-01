@@ -5,6 +5,7 @@ import TodayTasks from './components/TodayTasks';
 import GermanRoadmap from './components/GermanRoadmap';
 import EnglishRoadmap from './components/EnglishRoadmap';
 import HealthRoadmap from './components/HealthRoadmap';
+import GoalRoadmap from './components/GoalRoadmap';
 import { showToast } from './api';
 
 export default function App() {
@@ -72,6 +73,9 @@ export default function App() {
         {activePage === 'german' && <GermanRoadmap setActivePage={setActivePage} />}
         {activePage === 'english' && <EnglishRoadmap setActivePage={setActivePage} />}
         {activePage === 'health' && <HealthRoadmap setActivePage={setActivePage} />}
+        {!['dashboard', 'today', 'german', 'english', 'health'].includes(activePage) && (
+          <GoalRoadmap trackerId={activePage} setActivePage={setActivePage} />
+        )}
       </main>
     </div>
   );

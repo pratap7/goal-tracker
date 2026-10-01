@@ -180,33 +180,39 @@ export default function EnglishRoadmap({ setActivePage }) {
         </div>
       </div>
 
-      <div className="tracker-hero-card">
-        <div className="tracker-title-row">
-          <div className="tracker-badge-title">
-            <span className="tracker-icon-lg">📘</span>
-            <div>
-              <div className="tracker-pretitle">100-DAY FLUENCY & CONFIDENCE</div>
-              <h1 className="tracker-h1">English Fluency Mastery</h1>
-            </div>
+      {/* Detail Hero Card */}
+      <div className="detail-hero">
+        <div className="detail-hero-top">
+          <div className="detail-hero-titles">
+            <h2>
+              <span>📘</span> English Fluency Mastery
+            </h2>
+            <p>100-Day Fluency & Confidence Roadmap: Daily input, active speaking practice, vocabulary, and grammar mastery.</p>
           </div>
-          <div className="start-date-control">
-            <label className="start-date-label">Start Date:</label>
+          <div className="start-date-badge">
+            <span>📅 Start Date:</span>
             <input
               type="date"
-              className="start-date-input"
               value={startDate}
               onChange={(e) => handleStartDateChange(e.target.value)}
             />
           </div>
         </div>
 
-        <div className="progress-section-large">
-          <div className="progress-text-row">
-            <span>Overall Progress</span>
-            <span className="progress-fraction">{doneDays} of 100 Days Completed ({pct}%)</span>
+        <div style={{ marginTop: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+              Overall Roadmap Progress
+            </span>
+            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-main)' }}>
+              {doneDays} of 100 Days Completed ({pct}%)
+            </span>
           </div>
-          <div className="progress-bar-bg large">
-            <div className="progress-bar-fill english" style={{ width: `${pct}%` }} />
+          <div className="progress-bar-bg" style={{ height: '10px' }}>
+            <div
+              className="progress-bar-fill theme-english"
+              style={{ width: `${pct}%` }}
+            />
           </div>
         </div>
       </div>

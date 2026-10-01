@@ -105,6 +105,10 @@ class ApiController
                     $this->actionDeleteDailyTask();
                     break;
 
+                case 'delete_tracker':
+                    $this->actionDeleteTracker();
+                    break;
+
                 case 'reset_tracker':
                     $this->actionResetTracker();
                     break;
@@ -323,22 +327,53 @@ class ApiController
     }
 
     /**
-     * Save tracker meta.
+     * Save tracker meta (Add or Edit Goal).
      */
     private function actionSaveTrackerMeta(): void
     {
         $input = $this->getJsonInput();
         $trackerId = trim($input['trackerId'] ?? '');
         $title = trim($input['title'] ?? '');
-        $totalDays = (int)($input['totalDays'] ?? 100);
-        $startDate = !empty($input['startDate']) ? (string)$input['startDate'] : null;
+        $totalDays = max(1, (int)($input['totalDays'] ?? 100));
+        $startDate = !empty($input['startDate']) ? (string)$input['startDate'] : date('Y-m-d');
+        $emoji = trim((string)($input['emoji'] ?? '🎯'));
+        $subtitle = trim((string)($input['subtitle'] ?? ''));
+        $theme = trim((string)($input['theme'] ?? 'theme-german'));
+
+        if (!$trackerId) {
+            // Auto generate ID if not supplied
+            $trackerId = 'goal_' . time();
+        }
+
+        if (!$title) {
+            ApiResponse::error('Missing goal title', 400);
+        }
+
+        $this->trackerRepo->saveTrackerMeta($trackerId, $title, $totalDays, $startDate, $emoji, $subtitle, $theme);
+        ApiResponse::send([
+            'success' => true,
+            'message' => "Goal '{$title}' saved successfully",
+            'trackerId' => $trackerId
+        ]);
+    }
+
+    /**
+     * Delete tracker permanently.
+     */
+    private function actionDeleteTracker(): void
+    {
+        $input = $this->getJsonInput();
+        $trackerId = trim($input['trackerId'] ?? '');
 
         if (!$trackerId) {
             ApiResponse::error('Missing trackerId', 400);
         }
 
-        $this->trackerRepo->saveTrackerMeta($trackerId, $title, $totalDays, $startDate);
-        ApiResponse::send(['success' => true, 'message' => "Tracker meta saved for {$trackerId}"]);
+        $this->trackerRepo->deleteTracker($trackerId);
+        ApiResponse::send([
+            'success' => true,
+            'message' => "Goal '{$trackerId}' deleted successfully"
+        ]);
     }
 
     /**
