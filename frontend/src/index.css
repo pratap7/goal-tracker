@@ -878,18 +878,23 @@ h1, h2, h3, h4 {
 .task-input-label {
   flex: 1;
   background: transparent;
-  border: none;
+  border: 1px solid transparent;
   color: var(--text-main);
   font-family: inherit;
   font-size: 0.88rem;
-  padding: 4px 6px;
-  border-radius: 4px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
   outline: none;
   transition: var(--transition);
 }
+.task-input-label:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.15);
+}
 .task-input-label:focus {
   background: var(--bg-input);
-  box-shadow: 0 0 0 1px var(--border-focus);
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 1px #38bdf8;
 }
 .task-item-row.done .task-input-label {
   text-decoration: line-through;

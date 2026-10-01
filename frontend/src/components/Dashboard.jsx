@@ -668,17 +668,19 @@ export default function Dashboard({ setActivePage }) {
                       </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span className="locked-badge-pill" title="Sprint parameters are committed & locked">
+                      <span className="locked-badge-pill" title="Active sprint cannot be stopped or reset">
                         🔒 Locked
                       </span>
-                      <button
-                        type="button"
-                        className="challenge-del-btn"
-                        title="Delete permanently"
-                        onClick={() => handleDeleteChallenge(ch.id)}
-                      >
-                        ×
-                      </button>
+                      {isFinished && (
+                        <button
+                          type="button"
+                          className="challenge-del-btn"
+                          title="Delete completed sprint"
+                          onClick={() => handleDeleteChallenge(ch.id)}
+                        >
+                          ×
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -737,26 +739,34 @@ export default function Dashboard({ setActivePage }) {
 
                   {/* Actions Row */}
                   <div className="sprint-actions-row">
-                    {!ch.rewardRedeemed && (
-                      <button
-                        type="button"
-                        className="btn-redeem"
-                        onClick={() => {
-                          setRedeemModalCh(ch);
-                          setReflectionNote(ch.completionNote || '');
-                        }}
-                      >
-                        🎁 Redeem Reward & Attach Note
-                      </button>
+                    {isFinished ? (
+                      <>
+                        {!ch.rewardRedeemed && (
+                          <button
+                            type="button"
+                            className="btn-redeem"
+                            onClick={() => {
+                              setRedeemModalCh(ch);
+                              setReflectionNote(ch.completionNote || '');
+                            }}
+                          >
+                            🎁 Redeem Reward & Attach Note
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className="btn-archive"
+                          title="Move to Archive"
+                          onClick={() => handleArchive(ch.id)}
+                        >
+                          📦 Archive
+                        </button>
+                      </>
+                    ) : (
+                      <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontStyle: "italic", display: "flex", alignItems: "center", gap: "6px" }}>
+                        🔒 Active Commitment • Cannot be stopped or reset
+                      </span>
                     )}
-                    <button
-                      type="button"
-                      className="btn-archive"
-                      title="Move to Archive"
-                      onClick={() => handleArchive(ch.id)}
-                    >
-                      📦 Archive
-                    </button>
                   </div>
                 </div>
               );
@@ -1260,17 +1270,9 @@ export default function Dashboard({ setActivePage }) {
               </div>
 
               <div className="modal-actions" style={{ justifyContent: 'space-between', marginTop: '8px' }}>
-                {editingGoal.isCustom ? (
-                  <button
-                    type="button"
-                    className="btn-danger-modal"
-                    onClick={() => handleDeleteGoalFromDashboard(editingGoal)}
-                  >
-                    🗑 Delete Goal
-                  </button>
-                ) : (
-                  <div />
-                )}
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                  🔒 Active goal cannot be stopped or reset
+                </span>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button
                     type="button"

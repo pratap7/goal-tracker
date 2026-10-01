@@ -187,11 +187,20 @@ export default function GermanRoadmap({ setActivePage }) {
           ← Back to Dashboard
         </button>
         <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            type="button"
+            className="back-btn"
+            style={{
+              color: isEditMode ? '#10b981' : '#38bdf8',
+              borderColor: isEditMode ? 'rgba(16, 185, 129, 0.5)' : 'rgba(56, 189, 248, 0.4)',
+              background: isEditMode ? 'rgba(16, 185, 129, 0.1)' : 'transparent'
+            }}
+            onClick={() => setIsEditMode(prev => !prev)}
+          >
+            {isEditMode ? "✓ Done Editing" : "✏️ Edit Day Titles & Tasks"}
+          </button>
           <button type="button" className="back-btn" onClick={jumpNext}>
             ⚡ Jump to Next Day
-          </button>
-          <button type="button" className="back-btn" onClick={handleReset}>
-            Reset Plan
           </button>
         </div>
       </div>
@@ -253,6 +262,14 @@ export default function GermanRoadmap({ setActivePage }) {
               {goalTimer.isExpired ? "🏆 GOAL COMPLETED" : `${goalTimer.daysLeft}D REMAINING`}
             </span>
           </div>
+        </div>
+
+        {/* Non-Stoppable Commitment Banner */}
+        <div style={{ marginTop: '16px', padding: '10px 14px', borderRadius: 'var(--radius-sm)', background: 'rgba(56,189,248,0.06)', border: '1px solid rgba(56,189,248,0.2)', fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span>🔒</span>
+          <span>
+            <strong style={{ color: 'var(--text-main)' }}>Non-Stoppable Commitment:</strong> This goal roadmap cannot be stopped or reset once started. Day titles, custom tasks, reflections, and checklist items remain 100% editable.
+          </span>
         </div>
       </div>
 
@@ -443,6 +460,10 @@ function GermanDayCard({ dayNum, topic, songIdea, dayDate, dayData, updateDay, i
               onClick={(e) => {
                 e.stopPropagation();
                 setOpen(true);
+                setTimeout(() => {
+                  const el = document.querySelector(`#german-day-${dayNum} .edit-day-title-input`);
+                  if (el) el.focus();
+                }, 60);
               }}
             >
               ✏️
