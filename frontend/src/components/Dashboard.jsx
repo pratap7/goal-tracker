@@ -728,12 +728,11 @@ export default function Dashboard({ setActivePage }) {
           />
           <input
             type="text"
-            className="challenge-input"
+            className="challenge-input reward-input"
             placeholder="🎁 Reward (e.g. Cheat Meal Weekend)"
             disabled={isLimitReached}
             value={newReward}
             onChange={(e) => setNewReward(e.target.value)}
-            style={{ maxWidth: '240px' }}
           />
           <select
             className="challenge-select"
@@ -753,7 +752,6 @@ export default function Dashboard({ setActivePage }) {
             type="submit"
             className="add-challenge-btn"
             disabled={isLimitReached}
-            style={isLimitReached ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
           >
             + Start Sprint
           </button>
