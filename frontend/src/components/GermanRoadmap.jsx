@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { fetchApi, showToast, fireCelebration, todayStr, formatDate } from '../api';
+import { fetchApi, showToast, fireCelebration, todayStr, formatDate, getCountdownTiming } from '../api';
 import { GERMAN_LESSONS, DEFAULT_GERMAN_TASKS } from '../data/lessonsData';
 
 export default function GermanRoadmap({ setActivePage }) {
@@ -10,6 +10,13 @@ export default function GermanRoadmap({ setActivePage }) {
   const [activeWeek, setActiveWeek] = useState('all');
   const [loading, setLoading] = useState(true);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [now, setNow] = useState(Date.now());
+
+  // Live timer tick every second
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Load from MySQL
   useEffect(() => {
@@ -86,6 +93,12 @@ export default function GermanRoadmap({ setActivePage }) {
   }, [days]);
 
   const pct = Math.round((doneDays / 50) * 100);
+
+  const goalTimer = useMemo(() => {
+    return getCountdownTiming(startDate, 50, now);
+  }, [startDate, now]);
+
+  const targetDeadlineStr = formatDate(startDate, 49);
 
   const jumpNext = () => {
     for (let d = 1; d <= 50; d++) {
@@ -193,12 +206,13 @@ export default function GermanRoadmap({ setActivePage }) {
             <p>CEFR A1 Level Roadmap: Structured grammar, core vocabulary, audio immersion, and teach-back sessions.</p>
           </div>
           <div className="start-date-badge">
-            <span>📅 Start Date:</span>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => handleStartDateChange(e.target.value)}
-            />
+            <span>📅 Started:</span>
+            <span style={{ fontWeight: 800, color: 'var(--text-main)', fontSize: '0.86rem' }}>
+              {startDate}
+            </span>
+            <span className="locked-badge-pill" title="Goal parameters are locked once started to preserve consistency">
+              🔒 Locked
+            </span>
           </div>
         </div>
 
@@ -216,6 +230,28 @@ export default function GermanRoadmap({ setActivePage }) {
               className="progress-bar-fill theme-german"
               style={{ width: `${pct}%` }}
             />
+          </div>
+        </div>
+
+        {/* Live Goal Countdown Timer */}
+        <div className="goal-timer-widget">
+          <div className="goal-timer-left">
+            <span className="goal-timer-title">⏳ 50-Day Roadmap Target Countdown</span>
+            <span className="goal-timer-sub">Target Deadline: {targetDeadlineStr} • Locked Commitment</span>
+          </div>
+          <div className="goal-timer-right">
+            <div className="goal-timer-digits">
+              <span className="digit-unit"><span className="num">{goalTimer.days}</span><span className="lbl">DAYS</span></span>
+              <span className="digit-sep">:</span>
+              <span className="digit-unit"><span className="num">{goalTimer.hours}</span><span className="lbl">HOURS</span></span>
+              <span className="digit-sep">:</span>
+              <span className="digit-unit"><span className="num">{goalTimer.minutes}</span><span className="lbl">MINS</span></span>
+              <span className="digit-sep">:</span>
+              <span className="digit-unit"><span className="num">{goalTimer.seconds}</span><span className="lbl">SECS</span></span>
+            </div>
+            <span className={`goal-timer-badge ${goalTimer.isExpired ? 'expired' : ''}`}>
+              {goalTimer.isExpired ? "🏆 GOAL COMPLETED" : `${goalTimer.daysLeft}D REMAINING`}
+            </span>
           </div>
         </div>
       </div>

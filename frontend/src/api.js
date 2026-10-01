@@ -69,3 +69,44 @@ export function formatDate(startDateStr, dayOffset) {
     day: 'numeric'
   });
 }
+
+/**
+ * Live countdown timing helper for goals & sprints
+ */
+export function getCountdownTiming(startDateStr, totalDays, currentNow = Date.now()) {
+  const startMs = startDateStr
+    ? new Date(startDateStr + 'T00:00:00').getTime()
+    : currentNow;
+  const targetMs = startMs + (totalDays * 86400 * 1000);
+  const diffMs = targetMs - currentNow;
+  const isExpired = diffMs <= 0;
+
+  if (isExpired) {
+    return {
+      days: 0,
+      hours: '00',
+      minutes: '00',
+      seconds: '00',
+      formatted: '0:00:00:00',
+      daysLeft: 0,
+      isExpired: true
+    };
+  }
+
+  const totalSecs = Math.floor(diffMs / 1000);
+  const d = Math.floor(totalSecs / 86400);
+  const h = Math.floor((totalSecs % 86400) / 3600);
+  const m = Math.floor((totalSecs % 3600) / 60);
+  const s = totalSecs % 60;
+  const pad = (n) => String(n).padStart(2, '0');
+
+  return {
+    days: d,
+    hours: pad(h),
+    minutes: pad(m),
+    seconds: pad(s),
+    formatted: `${d}:${pad(h)}:${pad(m)}:${pad(s)}`,
+    daysLeft: d,
+    isExpired: false
+  };
+}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { fetchApi, showToast, fireCelebration, todayStr } from '../api';
+import { fetchApi, showToast, fireCelebration, todayStr, formatDate, getCountdownTiming } from '../api';
 
 const PRESET_CHALLENGES = [
   { title: "No Added Sugar", days: 7, reward: "Cheat Meal Weekend 🍰" },
@@ -26,6 +26,10 @@ export default function Dashboard({ setActivePage }) {
   const [redeemModalCh, setRedeemModalCh] = useState(null);
   const [reflectionNote, setReflectionNote] = useState("");
   const [showArchived, setShowArchived] = useState(false);
+
+  // Confirmation Modal States (Locked commitments)
+  const [confirmSprintData, setConfirmSprintData] = useState(null);
+  const [confirmGoalData, setConfirmGoalData] = useState(null);
 
   // Add Goal Modal State
   const [showAddGoalModal, setShowAddGoalModal] = useState(false);
@@ -233,16 +237,30 @@ export default function Dashboard({ setActivePage }) {
     };
   };
 
-  const handleAddChallenge = async (e) => {
+  const handleRequestStartChallenge = (e) => {
     e && e.preventDefault();
     if (isLimitReached) {
       showToast("⚠️ Maximum 5 active challenges allowed. Please complete or archive one first.");
       return;
     }
     const t = newTitle.trim();
-    if (!t) return;
+    if (!t) {
+      showToast("⚠️ Please enter a sprint title");
+      return;
+    }
     const d = Math.max(1, Math.min(90, parseInt(newDays, 10) || 7));
     const r = newReward.trim();
+
+    setConfirmSprintData({
+      title: t,
+      days: d,
+      reward: r
+    });
+  };
+
+  const handleConfirmStartChallenge = async () => {
+    if (!confirmSprintData) return;
+    const { title: t, days: d, reward: r } = confirmSprintData;
 
     const newCh = {
       id: `ch_${Date.now()}`,
@@ -257,6 +275,7 @@ export default function Dashboard({ setActivePage }) {
       endTime: new Date(Date.now() + d * 86400 * 1000).toISOString().replace('T', ' ').slice(0, 19)
     };
 
+    setConfirmSprintData(null);
     setNewTitle("");
     setNewDays(7);
     setNewReward("");
@@ -268,10 +287,11 @@ export default function Dashboard({ setActivePage }) {
     });
 
     if (res && res.success) {
-      showToast(`Started "${t}" challenge! ⚡`);
+      fireCelebration();
+      showToast(`⚡ Started & locked "${t}" sprint for ${d} days!`);
       loadData();
     } else {
-      showToast(`⚠️ ${res.error || 'Failed to start challenge'}`);
+      showToast(`⚠️ ${res?.error || 'Failed to start challenge'}`);
     }
   };
 
@@ -328,8 +348,8 @@ export default function Dashboard({ setActivePage }) {
     loadData();
   };
 
-  // Goal CRUD handlers
-  const handleCreateGoal = async (e) => {
+  // Goal CRUD handlers (Locked commitments)
+  const handleRequestCreateGoal = (e) => {
     e && e.preventDefault();
     const title = newGoalTitle.trim();
     if (!title) {
@@ -337,17 +357,38 @@ export default function Dashboard({ setActivePage }) {
       return;
     }
     const days = Math.max(1, Math.min(365, parseInt(newGoalDays, 10) || 30));
+    const startDate = newGoalStartDate || todayStr();
+
+    setConfirmGoalData({
+      title,
+      subtitle: newGoalSubtitle.trim() || `${days}-Day Mastery & Consistency Roadmap`,
+      emoji: newGoalEmoji || '🎯',
+      totalDays: days,
+      startDate,
+      theme: newGoalTheme || 'theme-german'
+    });
+  };
+
+  const handleConfirmCreateGoal = async () => {
+    if (!confirmGoalData) return;
+    const { title, subtitle, emoji, totalDays, startDate, theme } = confirmGoalData;
     const cleanId = 'goal_' + title.toLowerCase().replace(/[^a-z0-9]/g, '_').slice(0, 18) + '_' + Date.now().toString().slice(-4);
 
     const payload = {
       trackerId: cleanId,
       title,
-      subtitle: newGoalSubtitle.trim() || `${days}-Day Mastery & Consistency Roadmap`,
-      emoji: newGoalEmoji || '🎯',
-      totalDays: days,
-      startDate: newGoalStartDate || todayStr(),
-      theme: newGoalTheme || 'theme-german'
+      subtitle,
+      emoji,
+      totalDays,
+      startDate,
+      theme
     };
+
+    setConfirmGoalData(null);
+    setShowAddGoalModal(false);
+    setNewGoalTitle("");
+    setNewGoalSubtitle("");
+    setNewGoalDays(30);
 
     const res = await fetchApi('save_tracker_meta', {
       method: 'POST',
@@ -357,11 +398,7 @@ export default function Dashboard({ setActivePage }) {
 
     if (res && res.success) {
       fireCelebration();
-      showToast(`🎯 Goal "${title}" created successfully!`);
-      setShowAddGoalModal(false);
-      setNewGoalTitle("");
-      setNewGoalSubtitle("");
-      setNewGoalDays(30);
+      showToast(`🎯 Goal "${title}" started & locked for ${totalDays} days!`);
       loadData();
     } else {
       showToast(`⚠️ ${res?.error || 'Failed to create goal'}`);
@@ -545,10 +582,11 @@ export default function Dashboard({ setActivePage }) {
                   <span className="card-main-title">{cfg.title}</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span className="card-badge">{cfg.totalDays} Days</span>
+                    <span className="locked-badge-pill" title="Goal roadmap is committed & locked">🔒 Locked</span>
                     <button
                       type="button"
                       className="btn-card-edit"
-                      title="Edit goal settings"
+                      title="View / Customize goal settings"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleOpenEditGoal(cfg);
@@ -572,6 +610,21 @@ export default function Dashboard({ setActivePage }) {
               <div className="card-stats-row">
                 <span>{cfg.doneTasks} / {cfg.totalTasks} tasks done • Open Dedicated Page →</span>
                 <span className="pct-num">{cfg.pct}% • Day {cfg.doneDays} of {cfg.totalDays}</span>
+              </div>
+              <div className="card-stats-row" style={{ marginTop: '8px', paddingTop: '6px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                {(() => {
+                  const t = getCountdownTiming(cfg.startDate, cfg.totalDays, now);
+                  return (
+                    <>
+                      <span style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        ⏱️ <strong style={{ color: 'var(--text-main)', fontFamily: 'monospace' }}>{t.isExpired ? 'Goal Completed' : t.formatted}</strong>
+                      </span>
+                      <span style={{ fontSize: '0.74rem', color: 'var(--text-dim)' }}>
+                        Target: {formatDate(cfg.startDate, Math.max(0, cfg.totalDays - 1))}
+                      </span>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </div>
@@ -614,15 +667,10 @@ export default function Dashboard({ setActivePage }) {
                         {ch.days}-Day Sprint • Started {ch.startDate || 'Recently'}
                       </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center' }}>
-                      <button
-                        type="button"
-                        className="challenge-edit-btn"
-                        title="Edit sprint settings"
-                        onClick={() => handleOpenEditSprint(ch)}
-                      >
-                        ✏️
-                      </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span className="locked-badge-pill" title="Sprint parameters are committed & locked">
+                        🔒 Locked
+                      </span>
                       <button
                         type="button"
                         className="challenge-del-btn"
@@ -717,7 +765,7 @@ export default function Dashboard({ setActivePage }) {
         )}
 
         {/* Add Challenge Form */}
-        <form className="add-challenge-form" onSubmit={handleAddChallenge}>
+        <form className="add-challenge-form" onSubmit={handleRequestStartChallenge}>
           <input
             type="text"
             className="challenge-input"
@@ -773,9 +821,11 @@ export default function Dashboard({ setActivePage }) {
                   showToast("⚠️ Maximum 5 active challenges allowed. Please archive or finish one first.");
                   return;
                 }
-                setNewTitle(preset.title);
-                setNewDays(preset.days);
-                setNewReward(preset.reward || '');
+                setConfirmSprintData({
+                  title: preset.title,
+                  days: preset.days,
+                  reward: preset.reward || ''
+                });
               }}
             >
               + {preset.title} ({preset.days}d) 🎁
@@ -819,15 +869,10 @@ export default function Dashboard({ setActivePage }) {
                         Archived • {ch.days}-Day Sprint
                       </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center' }}>
-                      <button
-                        type="button"
-                        className="challenge-edit-btn"
-                        title="Edit sprint settings"
-                        onClick={() => handleOpenEditSprint(ch)}
-                      >
-                        ✏️
-                      </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span className="locked-badge-pill" title="Archived sprint is locked">
+                        🔒 Locked
+                      </span>
                       <button
                         type="button"
                         className="challenge-del-btn"
@@ -988,7 +1033,7 @@ export default function Dashboard({ setActivePage }) {
               </button>
             </div>
 
-            <form onSubmit={handleCreateGoal} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <form onSubmit={handleRequestCreateGoal} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div className="form-group">
                 <label className="form-label">Goal Title:</label>
                 <input
@@ -1084,7 +1129,7 @@ export default function Dashboard({ setActivePage }) {
                   Cancel
                 </button>
                 <button type="submit" className="btn-submit-modal">
-                  + Create Goal Roadmap
+                  Review & Start Goal →
                 </button>
               </div>
             </form>
@@ -1110,15 +1155,27 @@ export default function Dashboard({ setActivePage }) {
               </button>
             </div>
 
+            <div className="commitment-modal-warning" style={{ margin: '0 0 14px 0' }}>
+              <div className="warning-title">🔒 Goal Commitment Locked</div>
+              <p>
+                When a goal is started, you cannot change its core parameters.
+                The title, duration ({editingGoal.totalDays} days), and start date ({editingGoal.startDate}) are permanently locked to guarantee habit discipline.
+              </p>
+            </div>
+
             <form onSubmit={handleSaveEditGoal} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div className="form-group">
-                <label className="form-label">Goal Title:</label>
+                <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>Goal Title:</span>
+                  <span style={{ fontSize: '0.72rem', color: '#f59e0b', fontWeight: 700 }}>🔒 Locked</span>
+                </label>
                 <input
                   type="text"
                   className="form-input"
                   value={editGoalTitle}
-                  onChange={(e) => setEditGoalTitle(e.target.value)}
-                  required
+                  disabled
+                  style={{ opacity: 0.65, cursor: 'not-allowed', background: 'rgba(255,255,255,0.03)' }}
+                  title="Goal title cannot be altered once started"
                 />
               </div>
 
@@ -1150,23 +1207,31 @@ export default function Dashboard({ setActivePage }) {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div className="form-group">
-                  <label className="form-label">Duration (Days):</label>
+                  <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span>Duration (Days):</span>
+                    <span style={{ fontSize: '0.72rem', color: '#f59e0b', fontWeight: 700 }}>🔒 Locked</span>
+                  </label>
                   <input
                     type="number"
-                    min="1"
-                    max="365"
                     className="form-input"
                     value={editGoalDays}
-                    onChange={(e) => setEditGoalDays(e.target.value)}
+                    disabled
+                    style={{ opacity: 0.65, cursor: 'not-allowed', background: 'rgba(255,255,255,0.03)' }}
+                    title="Duration cannot be changed once started"
                   />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Start Date:</label>
+                  <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span>Start Date:</span>
+                    <span style={{ fontSize: '0.72rem', color: '#f59e0b', fontWeight: 700 }}>🔒 Locked</span>
+                  </label>
                   <input
                     type="date"
                     className="form-input"
                     value={editGoalStartDate}
-                    onChange={(e) => setEditGoalStartDate(e.target.value)}
+                    disabled
+                    style={{ opacity: 0.65, cursor: 'not-allowed', background: 'rgba(255,255,255,0.03)' }}
+                    title="Start date cannot be changed once started"
                   />
                 </div>
               </div>
@@ -1299,6 +1364,172 @@ export default function Dashboard({ setActivePage }) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Start Sprint Modal */}
+      {confirmSprintData && (
+        <div
+          className="modal-backdrop"
+          onClick={() => setConfirmSprintData(null)}
+        >
+          <div className="modal-box" style={{ maxWidth: '480px', border: '1px solid rgba(245, 158, 11, 0.45)' }}>
+            <div className="modal-head">
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                <span>⚡</span> Confirm Habit Sprint
+              </h3>
+              <button
+                type="button"
+                className="modal-close-btn"
+                onClick={() => setConfirmSprintData(null)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="commitment-modal-warning" style={{ margin: '14px 0 16px' }}>
+              <div className="warning-title">⚠️ Non-Negotiable Commitment</div>
+              <p>
+                When you start a sprint, <strong>you cannot change or edit it</strong>.
+                The duration, title, and start date are permanently locked to ensure your daily discipline and accountability.
+              </p>
+            </div>
+
+            <div
+              style={{
+                background: 'rgba(255,255,255,0.03)',
+                borderRadius: 'var(--radius-md)',
+                padding: '14px 16px',
+                border: '1px solid var(--border)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px',
+                marginBottom: '18px'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.84rem' }}>Sprint Title:</span>
+                <strong style={{ color: 'var(--text-main)', fontSize: '0.92rem' }}>{confirmSprintData.title}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.84rem' }}>Target Duration:</span>
+                <strong style={{ color: '#38bdf8', fontSize: '0.92rem' }}>{confirmSprintData.days} Days</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.84rem' }}>Start Date:</span>
+                <strong style={{ color: 'var(--text-main)', fontSize: '0.92rem' }}>{todayStr()} (Today)</strong>
+              </div>
+              {confirmSprintData.reward && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.84rem' }}>Earned Reward:</span>
+                  <strong style={{ color: '#f59e0b', fontSize: '0.92rem' }}>🎁 {confirmSprintData.reward}</strong>
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                type="button"
+                className="btn-archive"
+                onClick={() => setConfirmSprintData(null)}
+              >
+                Cancel / Modify
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                style={{
+                  background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                  boxShadow: '0 4px 14px rgba(245, 158, 11, 0.4)'
+                }}
+                onClick={handleConfirmStartChallenge}
+              >
+                🔒 Yes, Start & Lock Sprint
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Start Goal Modal */}
+      {confirmGoalData && (
+        <div
+          className="modal-backdrop"
+          onClick={() => setConfirmGoalData(null)}
+        >
+          <div className="modal-box" style={{ maxWidth: '480px', border: '1px solid rgba(99, 102, 241, 0.45)' }}>
+            <div className="modal-head">
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                <span>🎯</span> Confirm Goal Roadmap
+              </h3>
+              <button
+                type="button"
+                className="modal-close-btn"
+                onClick={() => setConfirmGoalData(null)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="commitment-modal-warning" style={{ margin: '14px 0 16px' }}>
+              <div className="warning-title">⚠️ Non-Negotiable Commitment</div>
+              <p>
+                When you start this goal, <strong>you cannot change it</strong>.
+                The duration ({confirmGoalData.totalDays} days) and start date ({confirmGoalData.startDate}) are permanently locked to preserve streak integrity.
+              </p>
+            </div>
+
+            <div
+              style={{
+                background: 'rgba(255,255,255,0.03)',
+                borderRadius: 'var(--radius-md)',
+                padding: '14px 16px',
+                border: '1px solid var(--border)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px',
+                marginBottom: '18px'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.84rem' }}>Goal Title:</span>
+                <strong style={{ color: 'var(--text-main)', fontSize: '0.92rem' }}>
+                  {confirmGoalData.emoji} {confirmGoalData.title}
+                </strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.84rem' }}>Total Duration:</span>
+                <strong style={{ color: '#818cf8', fontSize: '0.92rem' }}>{confirmGoalData.totalDays} Days</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.84rem' }}>Start Date:</span>
+                <strong style={{ color: 'var(--text-main)', fontSize: '0.92rem' }}>{confirmGoalData.startDate}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.84rem' }}>Target Completion:</span>
+                <strong style={{ color: '#10b981', fontSize: '0.92rem' }}>
+                  {formatDate(confirmGoalData.startDate, Math.max(0, confirmGoalData.totalDays - 1))}
+                </strong>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                type="button"
+                className="btn-archive"
+                onClick={() => setConfirmGoalData(null)}
+              >
+                ← Go Back & Edit
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={handleConfirmCreateGoal}
+              >
+                🔒 Yes, Start & Lock Goal
+              </button>
+            </div>
           </div>
         </div>
       )}

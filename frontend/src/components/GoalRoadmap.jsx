@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { fetchApi, showToast, fireCelebration, todayStr, formatDate } from '../api';
+import { fetchApi, showToast, fireCelebration, todayStr, formatDate, getCountdownTiming } from '../api';
 
 export default function GoalRoadmap({ trackerId, setActivePage }) {
   const [meta, setMeta] = useState(null);
@@ -9,6 +9,13 @@ export default function GoalRoadmap({ trackerId, setActivePage }) {
   const [activeWeek, setActiveWeek] = useState('all');
   const [loading, setLoading] = useState(true);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [now, setNow] = useState(Date.now());
+
+  // Live timer tick every second
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Edit Goal Settings Modal inside Roadmap
   const [showEditModal, setShowEditModal] = useState(false);
@@ -160,6 +167,12 @@ export default function GoalRoadmap({ trackerId, setActivePage }) {
   const pct = totalDays ? Math.min(100, Math.round((doneDays / totalDays) * 100)) : 0;
   const totalWeeks = Math.ceil(totalDays / 7);
 
+  const goalTimer = useMemo(() => {
+    return getCountdownTiming(startDate, totalDays, now);
+  }, [startDate, totalDays, now]);
+
+  const targetDeadlineStr = formatDate(startDate, Math.max(0, totalDays - 1));
+
   const jumpNext = () => {
     for (let d = 1; d <= totalDays; d++) {
       const item = days[d];
@@ -276,12 +289,13 @@ export default function GoalRoadmap({ trackerId, setActivePage }) {
             <p>{meta.subtitle || `${totalDays}-Day Mastery & Consistency Roadmap`}</p>
           </div>
           <div className="start-date-badge">
-            <span>📅 Start Date:</span>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => handleStartDateChange(e.target.value)}
-            />
+            <span>📅 Started:</span>
+            <span style={{ fontWeight: 800, color: 'var(--text-main)', fontSize: '0.86rem' }}>
+              {startDate}
+            </span>
+            <span className="locked-badge-pill" title="Goal parameters are locked once started to preserve consistency">
+              🔒 Locked
+            </span>
           </div>
         </div>
 
@@ -299,6 +313,28 @@ export default function GoalRoadmap({ trackerId, setActivePage }) {
               className={`progress-bar-fill ${meta.theme || 'theme-german'}`}
               style={{ width: `${pct}%` }}
             />
+          </div>
+        </div>
+
+        {/* Live Goal Countdown Timer */}
+        <div className="goal-timer-widget">
+          <div className="goal-timer-left">
+            <span className="goal-timer-title">⏳ {totalDays}-Day Roadmap Target Countdown</span>
+            <span className="goal-timer-sub">Target Deadline: {targetDeadlineStr} • Locked Commitment</span>
+          </div>
+          <div className="goal-timer-right">
+            <div className="goal-timer-digits">
+              <span className="digit-unit"><span className="num">{goalTimer.days}</span><span className="lbl">DAYS</span></span>
+              <span className="digit-sep">:</span>
+              <span className="digit-unit"><span className="num">{goalTimer.hours}</span><span className="lbl">HOURS</span></span>
+              <span className="digit-sep">:</span>
+              <span className="digit-unit"><span className="num">{goalTimer.minutes}</span><span className="lbl">MINS</span></span>
+              <span className="digit-sep">:</span>
+              <span className="digit-unit"><span className="num">{goalTimer.seconds}</span><span className="lbl">SECS</span></span>
+            </div>
+            <span className={`goal-timer-badge ${goalTimer.isExpired ? 'expired' : ''}`}>
+              {goalTimer.isExpired ? "🏆 GOAL COMPLETED" : `${goalTimer.daysLeft}D REMAINING`}
+            </span>
           </div>
         </div>
       </div>
@@ -446,15 +482,24 @@ export default function GoalRoadmap({ trackerId, setActivePage }) {
               </button>
             </div>
 
+            <div className="commitment-modal-warning" style={{ margin: '0 0 14px 0' }}>
+              <div className="warning-title">🔒 Goal Commitment Locked</div>
+              <p>Once started, a goal roadmap cannot be changed. The title, duration ({meta.totalDays} days), and start date ({meta.startDate}) are permanently locked to uphold discipline.</p>
+            </div>
+
             <form onSubmit={handleSaveGoalSettings} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div className="form-group">
-                <label className="form-label">Goal Title:</label>
+                <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>Goal Title:</span>
+                  <span style={{ fontSize: '0.72rem', color: '#f59e0b', fontWeight: 700 }}>🔒 Locked</span>
+                </label>
                 <input
                   type="text"
                   className="form-input"
                   value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                  required
+                  disabled
+                  style={{ opacity: 0.65, cursor: 'not-allowed', background: 'rgba(255,255,255,0.03)' }}
+                  title="Title cannot be altered once started"
                 />
               </div>
 
@@ -486,23 +531,31 @@ export default function GoalRoadmap({ trackerId, setActivePage }) {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div className="form-group">
-                  <label className="form-label">Total Days Duration:</label>
+                  <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span>Total Days:</span>
+                    <span style={{ fontSize: '0.72rem', color: '#f59e0b', fontWeight: 700 }}>🔒 Locked</span>
+                  </label>
                   <input
                     type="number"
-                    min="1"
-                    max="365"
                     className="form-input"
                     value={editTotalDays}
-                    onChange={(e) => setEditTotalDays(e.target.value)}
+                    disabled
+                    style={{ opacity: 0.65, cursor: 'not-allowed', background: 'rgba(255,255,255,0.03)' }}
+                    title="Duration cannot be changed once started"
                   />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Start Date:</label>
+                  <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span>Start Date:</span>
+                    <span style={{ fontSize: '0.72rem', color: '#f59e0b', fontWeight: 700 }}>🔒 Locked</span>
+                  </label>
                   <input
                     type="date"
                     className="form-input"
                     value={editStartDate}
-                    onChange={(e) => setEditStartDate(e.target.value)}
+                    disabled
+                    style={{ opacity: 0.65, cursor: 'not-allowed', background: 'rgba(255,255,255,0.03)' }}
+                    title="Start date cannot be changed once started"
                   />
                 </div>
               </div>
