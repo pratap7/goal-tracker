@@ -190,6 +190,118 @@ h1, h2, h3, h4 {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
+.nav-link-separator {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+  margin: 0 4px;
+  opacity: 0.7;
+}
+
+.nav-goal-btn {
+  max-width: 220px;
+}
+
+.nav-goal-emoji {
+  font-size: 0.95rem;
+  flex-shrink: 0;
+}
+
+.nav-goal-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nav-goal-badge {
+  font-size: 0.65rem;
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-dim);
+  font-family: monospace;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.nav-dropdown-wrapper {
+  position: relative;
+  display: inline-flex;
+}
+
+.nav-dropdown-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.nav-goals-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.45);
+  padding: 8px;
+  min-width: 220px;
+  z-index: 1000;
+  backdrop-filter: blur(16px);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  animation: cardFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.nav-dropdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: var(--transition);
+}
+
+.nav-dropdown-item:hover {
+  background: var(--bg-elevated);
+  color: var(--text-main);
+}
+
+.nav-dropdown-item.active {
+  background: rgba(99, 102, 241, 0.15);
+  color: #818cf8;
+}
+
+.dropdown-emoji {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.dropdown-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dropdown-days {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  background: rgba(0, 0, 0, 0.2);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+}
+
 .nav-actions {
   display: flex;
   align-items: center;

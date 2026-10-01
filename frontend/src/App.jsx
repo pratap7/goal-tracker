@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Navbar from './components/Navbar';
 import Dashboard from './components/Dashboard';
 import TodayTasks from './components/TodayTasks';
@@ -7,16 +7,46 @@ import EnglishRoadmap from './components/EnglishRoadmap';
 import HealthRoadmap from './components/HealthRoadmap';
 import GoalRoadmap from './components/GoalRoadmap';
 import AuthPage from './components/AuthPage';
-import { getStoredUser, fetchCurrentUser, authLogout, showToast } from './api';
+import { getStoredUser, fetchCurrentUser, authLogout, showToast, fetchApi } from './api';
 
 export default function App() {
   const [user, setUser] = useState(() => getStoredUser());
   const [authChecking, setAuthChecking] = useState(true);
   const [activePage, setActivePage] = useState('dashboard');
+  const [trackers, setTrackers] = useState([]);
   const [theme, setTheme] = useState(() => {
     return localStorage.getItem('goal_tracker_theme') || 'dark';
   });
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Load user's active goals for the header menu
+  const loadTrackers = useCallback(async () => {
+    if (!user) {
+      setTrackers([]);
+      return;
+    }
+    try {
+      const res = await fetchApi('get_all');
+      if (res && res.success && res.data && res.data.trackers) {
+        setTrackers(Object.values(res.data.trackers));
+      }
+    } catch (e) {
+      console.warn('Navbar tracker load error:', e);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    loadTrackers();
+  }, [loadTrackers]);
+
+  // Reactive listener whenever goals are created, edited, or deleted
+  useEffect(() => {
+    const handleUpdate = () => {
+      loadTrackers();
+    };
+    window.addEventListener('gt-trackers-updated', handleUpdate);
+    return () => window.removeEventListener('gt-trackers-updated', handleUpdate);
+  }, [loadTrackers]);
 
   // Check current session on mount
   useEffect(() => {
@@ -146,6 +176,7 @@ export default function App() {
         toggleFullscreen={toggleFullscreen}
         user={user}
         onLogout={handleLogout}
+        trackers={trackers}
       />
 
       <main style={{ marginTop: '20px' }}>
