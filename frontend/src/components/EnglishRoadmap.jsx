@@ -9,6 +9,7 @@ export default function EnglishRoadmap({ setActivePage }) {
   const [search, setSearch] = useState('');
   const [activeWeek, setActiveWeek] = useState('all');
   const [loading, setLoading] = useState(true);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   // Load from MySQL
   useEffect(() => {
@@ -252,7 +253,41 @@ export default function EnglishRoadmap({ setActivePage }) {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+
+        <button
+          type="button"
+          className={`btn-edit-mode ${isEditMode ? 'active' : ''}`}
+          style={{ marginLeft: 'auto' }}
+          onClick={() => {
+            const next = !isEditMode;
+            setIsEditMode(next);
+            showToast(next ? "✏️ Edit Mode Active: customize day titles & tasks directly" : "Exited Edit Mode ✓");
+          }}
+        >
+          {isEditMode ? "✓ Done Editing" : "✏️ Edit Mode"}
+        </button>
       </div>
+
+      {/* Edit Mode Banner */}
+      {isEditMode && (
+        <div className="edit-mode-banner" style={{ marginBottom: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '1.2rem' }}>✏️</span>
+            <div>
+              <strong>Edit Mode Active: </strong>
+              Type directly into any Day Title input in the list below, or expand cards to edit tasks. All edits auto-save directly to MySQL!
+            </div>
+          </div>
+          <button
+            type="button"
+            className="btn-edit-mode active"
+            style={{ padding: '4px 12px', fontSize: '0.76rem' }}
+            onClick={() => setIsEditMode(false)}
+          >
+            Exit Edit Mode ✓
+          </button>
+        </div>
+      )}
 
       <div className="week-presets-bar">
         <button
@@ -299,6 +334,7 @@ export default function EnglishRoadmap({ setActivePage }) {
                 dayDate={dayDate}
                 dayData={dayData}
                 updateDay={(d) => updateDay(dayNum, d)}
+                isEditMode={isEditMode}
               />
             </React.Fragment>
           );
@@ -308,7 +344,7 @@ export default function EnglishRoadmap({ setActivePage }) {
   );
 }
 
-function EnglishDayCard({ dayNum, topic, tip, dayDate, dayData, updateDay }) {
+function EnglishDayCard({ dayNum, topic, tip, dayDate, dayData, updateDay, isEditMode }) {
   const [open, setOpen] = useState(false);
   const total = dayData.tasks.length;
   const done = dayData.tasks.filter(t => t.done).length;
@@ -346,7 +382,32 @@ function EnglishDayCard({ dayNum, topic, tip, dayDate, dayData, updateDay }) {
       <div className="day-card-header" onClick={() => setOpen(o => !o)}>
         <span className="day-num-badge">D{dayNum}</span>
         <span className="day-date-str">{dayDate}</span>
-        <span className="day-topic-str">{topic}</span>
+        {isEditMode ? (
+          <input
+            type="text"
+            className="edit-day-title-input"
+            style={{ flex: 1, margin: '0 8px', padding: '4px 10px', fontSize: '0.88rem' }}
+            value={dayData.customTitle !== undefined && dayData.customTitle !== null && dayData.customTitle !== "" ? dayData.customTitle : topic}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => updateDay({ ...dayData, customTitle: e.target.value })}
+            placeholder="Custom Day Title..."
+          />
+        ) : (
+          <span className="day-topic-str">
+            {topic}
+            <button
+              type="button"
+              className="inline-title-edit-btn"
+              title="Edit Day Title & Tasks"
+              onClick={(e) => {
+                e.stopPropagation();
+                setOpen(true);
+              }}
+            >
+              ✏️
+            </button>
+          </span>
+        )}
         <span className={`day-progress-pill ${allDone ? 'done' : ''}`}>
           {allDone ? "Done ✓" : `${done}/${total}`}
         </span>

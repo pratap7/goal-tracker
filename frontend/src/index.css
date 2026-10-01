@@ -752,6 +752,29 @@ h1, h2, h3, h4 {
   font-weight: 600;
   color: var(--text-main);
   line-height: 1.3;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.inline-title-edit-btn {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  opacity: 0.7;
+  transition: var(--transition);
+  display: inline-flex;
+  align-items: center;
+}
+.day-card-header:hover .inline-title-edit-btn {
+  opacity: 1;
+}
+.inline-title-edit-btn:hover {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.14);
 }
 .day-progress-pill {
   font-size: 0.72rem;
